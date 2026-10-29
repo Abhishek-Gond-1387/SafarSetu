@@ -37,6 +37,10 @@ class TransitContext:
         max_trips: Optional[int] = None,
     ):
         target_dir = gtfs_dir or settings.GTFS_DATA_DIR
+        if not os.path.isdir(target_dir):
+            backend_candidate = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), target_dir)
+            if os.path.isdir(backend_candidate):
+                target_dir = backend_candidate
         target_source = source_id or settings.DEFAULT_SOURCE_ID
         trips_limit = max_trips if max_trips is not None else settings.MAX_LOADED_TRIPS
 

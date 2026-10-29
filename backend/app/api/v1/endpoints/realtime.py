@@ -21,6 +21,8 @@ def get_realtime_status():
     ctx = get_transit_context()
     status_obj = ctx.realtime_repo.get_status()
 
+    is_live_verified = (status_obj.last_poll_status == "success" and status_obj.feed_freshness.value == "fresh")
+
     return RealtimeStatusResponse(
         enabled=status_obj.enabled,
         api_key_configured=status_obj.api_key_configured,
@@ -30,6 +32,7 @@ def get_realtime_status():
         cached_vehicles_count=status_obj.cached_vehicles_count,
         rejected_entities_count=status_obj.rejected_entities_count,
         feed_freshness=status_obj.feed_freshness.value,
+        live_tracking_verified=is_live_verified,
         error_category=status_obj.error_category.value if status_obj.error_category else None,
         error_message=status_obj.error_message_sanitized,
     )

@@ -20,7 +20,7 @@ class RouteRanker:
             return []
 
         if criterion == RouteRankCriterion.FASTEST:
-            return sorted(journeys, key=lambda j: j.total_duration_seconds)
+            return sorted(journeys, key=lambda j: (j.total_elapsed_seconds, j.num_transfers))
 
         elif criterion == RouteRankCriterion.CHEAPEST:
             # Rule: Feeds with unknown fare must not be sorted as 0!
@@ -31,10 +31,10 @@ class RouteRanker:
             return sorted_complete + incomplete
 
         elif criterion == RouteRankCriterion.BALANCED:
-            # Weighted score: time_min + 1.5 * transfers + 0.01 * walk_m
+            # Weighted score: elapsed_min + 3.0 * transfers + 0.01 * walk_m
             def balanced_score(j: Journey) -> float:
-                mins = j.total_duration_seconds / 60.0
-                return mins + (1.5 * j.num_transfers) + (0.01 * j.total_walk_meters)
+                mins = j.total_elapsed_seconds / 60.0
+                return mins + (3.0 * j.num_transfers) + (0.01 * j.total_walk_meters)
 
             return sorted(journeys, key=balanced_score)
 

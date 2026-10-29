@@ -107,3 +107,59 @@ def test_parse_time_beyond_24_hours():
     sec_invalid = StopTime.parse_time("invalid_time")
     assert sec_invalid is None
 
+
+def test_stop_times_missing_required_column(temp_gtfs_dir):
+    # Rewrite stop_times.txt without 'departure_time'
+    with open(os.path.join(temp_gtfs_dir, "stop_times.txt"), "w", encoding="utf-8") as f:
+        f.write("trip_id,stop_id,stop_sequence,arrival_time\n")
+        f.write("T001,STOP1,1,08:00:00\n")
+
+    report = GTFSValidator.validate_directory(temp_gtfs_dir, source_id="test_missing_col")
+    assert report.is_valid is False
+    assert any("stop_times.txt missing columns" in err for err in report.errors)
+
+
+def test_stop_times_broken_foreign_key_stop_id(temp_gtfs_dir):
+    # Reference a stop that is not in stops.txt
+    with open(os.path.join(temp_gtfs_dir, "stop_times.txt"), "w", encoding="utf-8") as f:
+        f.write("trip_id,stop_id,stop_sequence,arrival_time,departure_time\n")
+        f.write("T001,NONEXISTENT_STOP,1,08:00:00,08:00:00\n")
+
+    report = GTFSValidator.validate_directory(temp_gtfs_dir, source_id="test_broken_stop_fk")
+    assert report.is_valid is False
+    assert any("references to nonexistent stop_id" in err for err in report.errors)
+
+
+def test_stop_times_monotonicity_and_dwell_violation(temp_gtfs_dir):
+    # Stop sequence 2 has arrival before sequence 1 departure, or departure before arrival
+    with open(os.path.join(temp_gtfs_dir, "stop_times.txt"), "w", encoding="utf-8") as f:
+        f.write("trip_id,stop_id,stop_sequence,arrival_time,departure_time\n")
+        f.write("T001,STOP1,1,08:20:00,08:10:00\n")  # departure before arrival!
+        f.write("T001,STOP2,2,08:05:00,08:05:00\n")  # arrival before prev departure!
+
+    report = GTFSValidator.validate_directory(temp_gtfs_dir, source_id="test_dwell_violation")
+    assert any("negative dwell times or backwards travel times" in w for w in report.warnings)
+
+
+def test_calendar_dates_exceptions_validation(temp_gtfs_dir):
+    with open(os.path.join(temp_gtfs_dir, "calendar_dates.txt"), "w", encoding="utf-8") as f:
+        f.write("service_id,date,exception_type\n")
+        f.write("DAILY,20230815,2\n")  # Independence Day: service removed
+        f.write("DAILY,20230816,1\n")  # Special service added
+        f.write("DAILY,20230817,9\n")  # Invalid exception type
+
+    report = GTFSValidator.validate_directory(temp_gtfs_dir, source_id="test_cal_dates")
+    assert report.counts["calendar_dates"] == 3
+    assert any("invalid exception_type '9'" in w for w in report.warnings)
+
+
+def test_transfers_file_validation(temp_gtfs_dir):
+    with open(os.path.join(temp_gtfs_dir, "transfers.txt"), "w", encoding="utf-8") as f:
+        f.write("from_stop_id,to_stop_id,transfer_type,min_transfer_time\n")
+        f.write("STOP1,STOP2,2,180\n")
+        f.write("STOP1,UNKNOWN_STOP,0,60\n")  # Unknown to_stop_id
+
+    report = GTFSValidator.validate_directory(temp_gtfs_dir, source_id="test_transfers")
+    assert any("references to nonexistent stop IDs" in w for w in report.warnings)
+
+

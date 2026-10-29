@@ -92,6 +92,7 @@ class JourneyOut(BaseModel):
     total_duration_minutes: float
     total_walk_meters: float
     num_transfers: int
+    initial_wait_minutes: float = 0.0
     fare_inr: Optional[float] = None
     fare_complete: bool
     fare_note: Optional[str] = None
@@ -109,6 +110,7 @@ class RoutePlanResponse(BaseModel):
     criterion: str
     journeys: List[JourneyOut]
     data_freshness_warnings: List[str] = Field(default_factory=list)
+    calendar_validity_note: Optional[str] = None
     no_route_reason: Optional[str] = None
 
 

@@ -98,6 +98,17 @@ This document records the empirical investigation of real transit data sources f
   - `entity.vehicle.timestamp`: Observation GPS timestamp.
   - `entity.vehicle.trip.trip_id`: Operating trip identifier (when supplied by vehicle computer).
   - `entity.vehicle.trip.route_id`: Operating route identifier.
+
+---
+
+## 6. Stage 3 Routing Audit & Data Freshness Classification
+
+In accordance with Stage 3 non-negotiable data rules:
+1. **Historical Timetables**: Feed `mdb-1262` active service calendar ended on `2024-01-01`. All journey planning responses explicitly return `calendar_validity_note` and `data_freshness_warnings` stating that results reflect historical schedule timetables.
+2. **Missing Fare Handling**: GTFS `fare_attributes.txt` and `fare_rules.txt` are absent from `mdb-1262`. Fares are reported as `null` with `fare_complete: false` and explanatory notes; missing fares are never treated as zero.
+3. **Real-time Live Verification**: Live vehicle tracking is reported as `live_tracking_verified: false` whenever the backend is running without active, verified OTD streaming credentials. No predicted ETAs are synthesized or inferred solely from vehicle coordinates.
+4. **Pedestrian Transfers**: All synthesized walking transfers strictly report `distance_type: "straight_line"` and are calculated via Haversine distance with assumed 1.2 m/s walk velocity.
+
   - `entity.vehicle.current_stop_sequence`: Current stop sequence index.
   - `entity.vehicle.current_status`: Vehicle transit status (`INCOMING_AT`, `STOPPED_AT`, `IN_TRANSIT_TO`).
 - **Known Limitations & Truthful Handling:**

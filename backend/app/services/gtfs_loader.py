@@ -173,6 +173,28 @@ class GTFSLoader:
                     except (ValueError, IndexError):
                         continue
 
+        # 4b. Calendar Dates
+        calendar_dates: Dict[str, List[CalendarDate]] = {}
+        cd_file = os.path.join(dir_path, "calendar_dates.txt")
+        if os.path.exists(cd_file):
+            with open(cd_file, "r", encoding="utf-8-sig", errors="replace") as f:
+                for row in csv.DictReader(f):
+                    sid = row.get("service_id", "").strip()
+                    d_str = row.get("date", "").strip()
+                    ex_type_str = row.get("exception_type", "").strip()
+                    if not sid or not d_str or not ex_type_str:
+                        continue
+                    try:
+                        ex_date = date(int(d_str[:4]), int(d_str[4:6]), int(d_str[6:8]))
+                        ex_type = ExceptionType(int(ex_type_str))
+                        if sid not in calendar_dates:
+                            calendar_dates[sid] = []
+                        calendar_dates[sid].append(
+                            CalendarDate(service_id=sid, date=ex_date, exception_type=ex_type)
+                        )
+                    except (ValueError, IndexError):
+                        continue
+
         # 5. Trips
         trips: Dict[str, Trip] = {}
         trips_file = os.path.join(dir_path, "trips.txt")
@@ -230,6 +252,80 @@ class GTFSLoader:
         for tid in stop_times:
             stop_times[tid].sort(key=lambda x: x.stop_sequence)
 
+        # 7. Transfers
+        transfers: List[Transfer] = []
+        transfers_file = os.path.join(dir_path, "transfers.txt")
+        if os.path.exists(transfers_file):
+            with open(transfers_file, "r", encoding="utf-8-sig", errors="replace") as f:
+                for row in csv.DictReader(f):
+                    from_sid = row.get("from_stop_id", "").strip()
+                    to_sid = row.get("to_stop_id", "").strip()
+                    if not from_sid or not to_sid or from_sid not in stops or to_sid not in stops:
+                        continue
+                    tt_raw = row.get("transfer_type", "0").strip()
+                    try:
+                        tt = TransferType(int(tt_raw)) if tt_raw else TransferType.RECOMMENDED
+                    except ValueError:
+                        tt = TransferType.RECOMMENDED
+                    mtt_raw = row.get("min_transfer_time", "").strip()
+                    mtt = int(mtt_raw) if mtt_raw and mtt_raw.isdigit() else None
+                    transfers.append(
+                        Transfer(
+                            from_stop_id=from_sid,
+                            to_stop_id=to_sid,
+                            transfer_type=tt,
+                            min_transfer_time=mtt,
+                        )
+                    )
+
+        # 8. Fare Attributes
+        fare_attributes: Dict[str, FareAttribute] = {}
+        fa_file = os.path.join(dir_path, "fare_attributes.txt")
+        if os.path.exists(fa_file):
+            with open(fa_file, "r", encoding="utf-8-sig", errors="replace") as f:
+                for row in csv.DictReader(f):
+                    fid = row.get("fare_id", "").strip()
+                    if not fid:
+                        continue
+                    try:
+                        price = float(row.get("price", 0.0))
+                    except ValueError:
+                        continue
+                    pm_raw = row.get("payment_method", "0").strip()
+                    pm = int(pm_raw) if pm_raw and pm_raw.isdigit() else 0
+                    tr_raw = row.get("transfers", "").strip()
+                    tr = int(tr_raw) if tr_raw and tr_raw.isdigit() else None
+                    td_raw = row.get("transfer_duration", "").strip()
+                    td = int(td_raw) if td_raw and td_raw.isdigit() else None
+                    fare_attributes[fid] = FareAttribute(
+                        fare_id=fid,
+                        price=price,
+                        currency_type=row.get("currency_type", "INR").strip(),
+                        payment_method=pm,
+                        transfers=tr,
+                        agency_id=row.get("agency_id"),
+                        transfer_duration=td,
+                    )
+
+        # 9. Fare Rules
+        fare_rules: List[FareRule] = []
+        fr_file = os.path.join(dir_path, "fare_rules.txt")
+        if os.path.exists(fr_file):
+            with open(fr_file, "r", encoding="utf-8-sig", errors="replace") as f:
+                for row in csv.DictReader(f):
+                    fid = row.get("fare_id", "").strip()
+                    if not fid or fid not in fare_attributes:
+                        continue
+                    fare_rules.append(
+                        FareRule(
+                            fare_id=fid,
+                            route_id=row.get("route_id"),
+                            origin_id=row.get("origin_id"),
+                            destination_id=row.get("destination_id"),
+                            contains_id=row.get("contains_id"),
+                        )
+                    )
+
         # FeedInfo
         feed_info: Optional[FeedInfo] = None
         fi_file = os.path.join(dir_path, "feed_info.txt")
@@ -263,11 +359,11 @@ class GTFSLoader:
             trips=trips,
             stop_times=stop_times,
             calendar=calendar,
-            calendar_dates={},
+            calendar_dates=calendar_dates,
             shapes={},
-            transfers=[],
-            fare_attributes={},
-            fare_rules=[],
+            transfers=transfers,
+            fare_attributes=fare_attributes,
+            fare_rules=fare_rules,
             validation_errors=val_report.errors,
             validation_warnings=val_report.warnings,
             source_id=source_id,

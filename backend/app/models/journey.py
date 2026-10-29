@@ -77,6 +77,12 @@ class Journey:
     feed_expired: bool = False
     provenance_sources: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
+    initial_wait_seconds: int = 0
+
+    @property
+    def total_elapsed_seconds(self) -> int:
+        """Total elapsed duration including initial waiting time."""
+        return self.total_duration_seconds + self.initial_wait_seconds
 
     @property
     def departure_time_str(self) -> str:
@@ -93,7 +99,7 @@ class Journey:
     @property
     def summary(self) -> str:
         modes = "+".join(sorted({l.mode.value for l in self.legs if l.mode != LegMode.WALK}))
-        mins = self.total_duration_seconds // 60
+        mins = self.total_elapsed_seconds // 60
         fare = f"₹{self.total_fare_inr:.0f}" if self.fare_complete and self.total_fare_inr is not None else "fare unknown"
         return f"{modes or 'walk'} · {mins} min · {fare}"
 

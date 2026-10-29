@@ -98,5 +98,39 @@ The backend exposes clean structured tools for the future AI agent reasoning lay
 | `get_nearby_vehicles` | `GET /api/v1/realtime/vehicles` | Finds live vehicles operating within geographic bounds or route filters. |
 | `plan_journey` | `POST /api/v1/routes/plan` | Returns scheduled feasible multimodal itineraries with transfer counts. |
 | `compare_routes` | `POST /api/v1/routes/compare` | Compares journey alternatives on duration, walking, and transfers. |
+
+---
+
+## 6. Stage 3 Routing Engine Audit & Correctness Hardening
+
+### 6.1 Audit Findings & Architectural Defects Resolved
+1. **Disabled Walking Transfers in Delhi**:
+   - *Previous defect*: `len(dataset.stops) <= 5000` disabled all pedestrian walking transfers because Delhi has 6,342 stops.
+   - *Solution*: Implemented an $O(N)$ spatial grid hash partition (0.005° cells ~ 500m). Synthesizes 19,158 authentic walking links across Delhi bus stops in 1.1 seconds.
+2. **Priority Queue Tuple Comparison Crash Risk**:
+   - *Previous defect*: `(curr_time, num_transfers, curr_stop, curr_trip_id, legs)` crashed if the first four keys tied, because `JourneyLeg` lacks `<` ordering.
+   - *Solution*: Added an integer sequence counter (`itertools.count()`) as a deterministic tiebreaker.
+3. **Suboptimal Pruning & Branch Mutation Bug**:
+   - *Previous defect*: In-place mutation of `last_leg` during path expansion corrupted sibling search branches sharing parent legs.
+   - *Solution*: Full immutability in leg aggregation (`JourneyLeg` replacement without in-place mutation).
+4. **Fastest Ranking Metric Flaw**:
+   - *Previous defect*: Ranked fastest routes by transit leg duration alone, ignoring initial wait time between user request and departure.
+   - *Solution*: Aligned fastest ranking with total elapsed travel time (`total_duration_seconds + initial_wait_seconds`).
+5. **Freshness & Service Expiration Distinctions**:
+   - API endpoints explicitly differentiate:
+     - Source service-calendar validity (`calendar_validity_note`)
+     - Historical feed expiration vs current operating date
+     - Real-time polling status vs verified live tracking (`live_tracking_verified`)
+
+### 6.2 Performance Benchmarks on Genuine Delhi Dataset (mdb-1262)
+- **Stops Ingested**: 6,342 authentic stops
+- **Routes Ingested**: 2,964 routes
+- **Trips Ingested**: 10,000 trips (benchmark slice) / 78,515 trips total
+- **Graph Construction**: 1.105 seconds (380,142 transit edges + 19,158 spatial walking edges)
+- **Direct Journey Latency**: 13.49 ms
+- **Cross-Network Transfer Latency**: 5.39 ms
+- **Off-Peak Journey Latency**: 7.92 ms
+- **Process Memory**: 232.0 MB
+
 | `search_stops` | `GET /api/v1/stops` | Searches authentic bus stops by name or terminal code. |
 | `get_nearby_stops` | `GET /api/v1/stops/nearby` | Finds stops near coordinates with explicit straight-line distance notes. |

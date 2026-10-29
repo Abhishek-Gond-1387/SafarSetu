@@ -9,7 +9,7 @@ from app.services.graph_builder import GraphBuilder
 from app.services.gtfs_loader import GTFSLoader
 from app.services.routing_engine import RoutingEngine
 
-REAL_DATA_DIR = "data/raw/mdb-1262"
+REAL_DATA_DIR = "data/raw/mdb-1262" if os.path.isdir("data/raw/mdb-1262") else "backend/data/raw/mdb-1262"
 
 
 @pytest.fixture(scope="module")

@@ -4,19 +4,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 import heapq
+from itertools import count
 from typing import Dict, List, Optional, Set, Tuple
 
 from app.models.journey import Journey, JourneyLeg, LegMode, RouteRankCriterion
 from app.models.transit import GTFSDataset, StopTime
 from app.services.graph_builder import ScheduledTransitEdge, TransitGraph
-
-
-@dataclass
-class RoutingState:
-    arrival_time_sec: int
-    transfers: int
-    walk_meters: float
-    path: List[Tuple[str, Optional[ScheduledTransitEdge], Optional[float]]] # (stop_id, edge_used, walk_dist)
 
 
 class RoutingEngine:
@@ -34,9 +27,10 @@ class RoutingEngine:
         departure_seconds: int,
         max_transfers: int = 3,
         criterion: RouteRankCriterion = RouteRankCriterion.FASTEST,
+        max_candidates: int = 3,
     ) -> Tuple[List[Journey], Optional[str]]:
         """Compute candidate journeys from origin to destination.
-        
+
         Returns:
             Tuple of (list_of_journeys, no_route_reason_if_empty).
         """
@@ -47,49 +41,78 @@ class RoutingEngine:
         if origin_stop_id == destination_stop_id:
             return [], "Origin and destination stops are identical."
 
-        # Check calendar validity for departure_date
+        # Determine calendar service filter for departure_date
+        cal_start = min((cs.start_date for cs in self.dataset.calendar.values()), default=None)
+        cal_end = max((cs.end_date for cs in self.dataset.calendar.values()), default=None)
+        is_historical = cal_end is not None and cal_end < date.today()
+
         active_services: Set[str] = set()
-        for sid in self.dataset.calendar:
-            if self.dataset.service_active_on(sid, departure_date):
-                active_services.add(sid)
+        if cal_start and cal_end and (cal_start <= departure_date <= cal_end):
+            # Strict date-range calendar check
+            for sid in self.dataset.calendar:
+                if self.dataset.service_active_on(sid, departure_date):
+                    active_services.add(sid)
+            # If date is within calendar range but no services active (e.g. holiday or inactive day)
+            if not active_services and self.dataset.calendar:
+                return [], f"No scheduled transit services operate on {departure_date.isoformat()}."
+        elif self.dataset.calendar:
+            # Query date is outside feed calendar range (historical or future query).
+            # Match by weekday flag to allow planning on historical schedules.
+            weekday = departure_date.weekday()
+            for sid, cs in self.dataset.calendar.items():
+                flags = [cs.monday, cs.tuesday, cs.wednesday, cs.thursday, cs.friday, cs.saturday, cs.sunday]
+                if flags[weekday]:
+                    active_services.add(sid)
 
-        # Priority queue for Time-Dependent Dijkstra:
-        # elements: (arrival_time_sec, transfers, current_stop_id, current_trip_id, legs_history)
-        # We allow up to max_transfers
-        pq = []
-        heapq.heappush(pq, (departure_seconds, 0, origin_stop_id, None, []))
+        # Priority queue: (arrival_time_sec, num_transfers, tiebreaker, current_stop_id, current_trip_id, legs)
+        counter = count()
+        pq: List[Tuple[int, int, int, str, Optional[str], List[JourneyLeg]]] = []
+        heapq.heappush(pq, (departure_seconds, 0, next(counter), origin_stop_id, None, []))
 
-        # Best arrival tracking: (stop_id, transfers) -> earliest arrival
-        best_arrivals: Dict[Tuple[str, int], int] = {}
+        # Track arrival times per (stop_id, transfers) to permit up to 2 distinct arrival alternatives per stop
+        best_arrivals: Dict[Tuple[str, int], List[int]] = {}
         found_journeys: List[Journey] = []
 
         TRANSFER_BUFFER_SEC = 120  # Minimum 2 minutes buffer when switching lines
         MAX_SEARCH_HORIZON_SEC = 14 * 3600  # Search up to 14 hours after departure
 
-        while pq and len(found_journeys) < 3:
-            curr_time, num_transfers, curr_stop, curr_trip_id, legs = heapq.heappop(pq)
+        while pq and len(found_journeys) < max_candidates:
+            curr_time, num_transfers, _, curr_stop, curr_trip_id, legs = heapq.heappop(pq)
 
             if curr_time > departure_seconds + MAX_SEARCH_HORIZON_SEC:
                 break
 
             # Destination reached!
             if curr_stop == destination_stop_id and legs:
-                journey = self._assemble_journey(legs, criterion)
-                # Check for duplicates
-                if not any(j.departure_time_str == journey.departure_time_str and j.arrival_time_str == journey.arrival_time_str for j in found_journeys):
+                journey = self._assemble_journey(
+                    legs,
+                    criterion,
+                    requested_dep_seconds=departure_seconds,
+                    requested_date=departure_date,
+                    is_historical=is_historical,
+                )
+                # Deduplicate by departure & arrival time
+                if not any(
+                    j.departure_time_str == journey.departure_time_str and j.arrival_time_str == journey.arrival_time_str
+                    for j in found_journeys
+                ):
                     found_journeys.append(journey)
                 continue
 
             state_key = (curr_stop, num_transfers)
-            if state_key in best_arrivals and best_arrivals[state_key] < curr_time:
+            existing_arrivals = best_arrivals.get(state_key, [])
+            if len(existing_arrivals) >= 2 and curr_time >= max(existing_arrivals):
                 continue
-            best_arrivals[state_key] = curr_time
+            if any(abs(arr - curr_time) < 60 for arr in existing_arrivals):
+                continue
+            existing_arrivals.append(curr_time)
+            best_arrivals[state_key] = existing_arrivals
 
             # 1. Scheduled Transit Outgoing Edges
             transit_edges = self.graph.get_transit_departures(curr_stop, after_seconds=curr_time)
             for edge in transit_edges:
                 trip = self.dataset.trips.get(edge.trip_id)
-                # Check calendar service filter if calendar data exists
+                # Check calendar service filter
                 if active_services and trip and trip.service_id not in active_services:
                     continue
 
@@ -118,18 +141,31 @@ class RoutingEngine:
                 )
 
                 new_legs = list(legs)
-                # Collapse consecutive legs on the same trip
+                # Collapse consecutive legs on the same trip cleanly without mutating shared parent objects
                 if new_legs and new_legs[-1].trip_id == edge.trip_id and new_legs[-1].to_stop_id == edge.from_stop_id:
-                    last_leg = new_legs[-1]
-                    last_leg.to_stop_id = edge.to_stop_id
-                    last_leg.to_stop_name = self.dataset.stops[edge.to_stop_id].stop_name
-                    last_leg.arrival_seconds = edge.arrival_seconds
-                    last_leg.duration_seconds = edge.arrival_seconds - last_leg.departure_seconds
-                    last_leg.intermediate_stops.append(edge.from_stop_id)
+                    prev = new_legs[-1]
+                    collapsed_leg = JourneyLeg(
+                        mode=prev.mode,
+                        from_stop_id=prev.from_stop_id,
+                        to_stop_id=edge.to_stop_id,
+                        from_stop_name=prev.from_stop_name,
+                        to_stop_name=self.dataset.stops[edge.to_stop_id].stop_name,
+                        departure_seconds=prev.departure_seconds,
+                        arrival_seconds=edge.arrival_seconds,
+                        duration_seconds=edge.arrival_seconds - prev.departure_seconds,
+                        route_id=prev.route_id,
+                        trip_id=prev.trip_id,
+                        intermediate_stops=prev.intermediate_stops + [edge.from_stop_id],
+                        source_id=prev.source_id,
+                    )
+                    new_legs[-1] = collapsed_leg
                 else:
                     new_legs.append(new_leg)
 
-                heapq.heappush(pq, (edge.arrival_seconds, next_transfers, edge.to_stop_id, edge.trip_id, new_legs))
+                heapq.heappush(
+                    pq,
+                    (edge.arrival_seconds, next_transfers, next(counter), edge.to_stop_id, edge.trip_id, new_legs),
+                )
 
             # 2. Walking Transfer Edges (if not walking consecutively)
             if not (legs and legs[-1].mode == LegMode.WALK):
@@ -147,7 +183,10 @@ class RoutingEngine:
                         distance_meters=walk_edge.distance_meters,
                         walk_distance_type="straight_line",
                     )
-                    heapq.heappush(pq, (arr_walk, num_transfers, walk_edge.to_stop_id, None, legs + [walk_leg]))
+                    heapq.heappush(
+                        pq,
+                        (arr_walk, num_transfers, next(counter), walk_edge.to_stop_id, None, legs + [walk_leg]),
+                    )
 
         if not found_journeys:
             reason = (
@@ -160,20 +199,42 @@ class RoutingEngine:
 
         return found_journeys, None
 
-    def _assemble_journey(self, legs: List[JourneyLeg], criterion: RouteRankCriterion) -> Journey:
-        total_sec = legs[-1].arrival_seconds - legs[0].departure_seconds if legs else 0
+    @staticmethod
+    def _validate_leg_chronology(legs: List[JourneyLeg]) -> bool:
+        """Verify strict chronological sequence and non-negative leg durations."""
+        if not legs:
+            return True
+        for i, leg in enumerate(legs):
+            if leg.arrival_seconds < leg.departure_seconds:
+                return False
+            if i > 0 and leg.departure_seconds < legs[i - 1].arrival_seconds:
+                return False
+        return True
+
+    def _assemble_journey(
+        self,
+        legs: List[JourneyLeg],
+        criterion: RouteRankCriterion,
+        requested_dep_seconds: int = 0,
+        requested_date: Optional[date] = None,
+        is_historical: bool = False,
+    ) -> Journey:
+        assert self._validate_leg_chronology(legs), "Journey legs must be strictly chronological"
+
+        first_dep = legs[0].departure_seconds if legs else requested_dep_seconds
+        last_arr = legs[-1].arrival_seconds if legs else requested_dep_seconds
+        transit_sec = max(0, last_arr - first_dep)
+        initial_wait_sec = max(0, first_dep - requested_dep_seconds)
         total_walk = sum(l.distance_meters or 0 for l in legs if l.mode == LegMode.WALK)
-        # Count transfers: number of transit vehicle boardings minus 1
+
         transit_legs = [l for l in legs if l.mode != LegMode.WALK]
         num_transfers = max(0, len(transit_legs) - 1)
 
-        # Fare computation:
-        # If dataset lacks fare data, fare is None and fare_complete is False per Section 4
+        # Fare computation
         has_fares = self.dataset.has_fare_data
         total_fare = None
         fare_complete = False
         if has_fares:
-            # sum known leg fares
             leg_fares = [l.fare_inr for l in transit_legs if l.fare_inr is not None]
             if len(leg_fares) == len(transit_legs):
                 total_fare = sum(leg_fares)
@@ -194,7 +255,7 @@ class RoutingEngine:
 
         return Journey(
             legs=legs,
-            total_duration_seconds=total_sec,
+            total_duration_seconds=transit_sec,
             total_walk_meters=total_walk,
             num_transfers=num_transfers,
             total_fare_inr=total_fare,
@@ -203,5 +264,6 @@ class RoutingEngine:
             feed_expired=is_expired,
             provenance_sources=[self.dataset.source_id],
             warnings=warnings,
+            initial_wait_seconds=initial_wait_sec,
         )
 

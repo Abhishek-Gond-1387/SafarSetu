@@ -122,3 +122,28 @@ def test_api_v1_route_compare_endpoint():
     # Fare unknown handling: rank_cheapest must be None when fare is incomplete
     assert data["metrics"][0]["rank_cheapest"] is None
 
+
+def test_api_v1_route_plan_identical_origin_dest():
+    payload = {
+        "origin_stop_id": "STOP_A",
+        "destination_stop_id": "STOP_A",
+        "departure_date": "2024-06-01",
+        "departure_time": "08:00:00",
+    }
+    response = client.post("/api/v1/routes/plan", json=payload)
+    assert response.status_code == 400
+    assert "Origin and destination stops are identical" in response.json()["detail"]
+
+
+def test_api_v1_route_plan_nonexistent_stop():
+    payload = {
+        "origin_stop_id": "NONEXISTENT_99999",
+        "destination_stop_id": "STOP_B",
+        "departure_date": "2024-06-01",
+        "departure_time": "08:00:00",
+    }
+    response = client.post("/api/v1/routes/plan", json=payload)
+    assert response.status_code == 404
+    assert "does not exist in dataset" in response.json()["detail"]
+
+

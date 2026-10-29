@@ -43,7 +43,7 @@ class GTFSValidator:
     REQUIRED_STOP_COLS = {"stop_id", "stop_name", "stop_lat", "stop_lon"}
     REQUIRED_ROUTE_COLS = {"route_id", "route_type"}
     REQUIRED_TRIP_COLS = {"trip_id", "route_id", "service_id"}
-    REQUIRED_STOP_TIME_COLS = {"trip_id", "stop_id", "stop_sequence"}
+    REQUIRED_STOP_TIME_COLS = {"trip_id", "stop_id", "stop_sequence", "arrival_time", "departure_time"}
 
     @classmethod
     def validate_directory(cls, dir_path: str, source_id: str = "gtfs") -> ValidationReport:
@@ -124,7 +124,7 @@ class GTFSValidator:
                     route_ids.add(rid)
         counts["routes"] = len(route_ids)
 
-        # 4. Validate Calendar & Expiry
+        # 4. Validate Calendar & Calendar Dates
         service_ids: Set[str] = set()
         calendar_file = os.path.join(dir_path, "calendar.txt")
         if os.path.exists(calendar_file):
@@ -147,7 +147,33 @@ class GTFSValidator:
                                 feed_end = ed
                     except ValueError:
                         pass
+
+        cal_dates_file = os.path.join(dir_path, "calendar_dates.txt")
+        cal_dates_count = 0
+        if os.path.exists(cal_dates_file):
+            with open(cal_dates_file, mode="r", encoding="utf-8-sig", errors="replace") as f:
+                reader = csv.DictReader(f)
+                for row_idx, row in enumerate(reader, start=2):
+                    sid = row.get("service_id", "").strip()
+                    if sid:
+                        service_ids.add(sid)
+                    d_str = row.get("date", "").strip()
+                    ex_type = row.get("exception_type", "").strip()
+                    if ex_type not in ("1", "2"):
+                        warnings.append(f"calendar_dates.txt line {row_idx}: invalid exception_type '{ex_type}'")
+                    try:
+                        if len(d_str) == 8:
+                            cd = date(int(d_str[:4]), int(d_str[4:6]), int(d_str[6:8]))
+                            if feed_start is None or cd < feed_start:
+                                feed_start = cd
+                            if feed_end is None or cd > feed_end:
+                                feed_end = cd
+                    except ValueError:
+                        warnings.append(f"calendar_dates.txt line {row_idx}: invalid date format '{d_str}'")
+                    cal_dates_count += 1
+
         counts["services"] = len(service_ids)
+        counts["calendar_dates"] = cal_dates_count
 
         # 5. Validate Trips & Route Foreign Keys
         trip_ids: Set[str] = set()
@@ -179,9 +205,94 @@ class GTFSValidator:
         if broken_route_refs > 0:
             errors.append(f"trips.txt contains {broken_route_refs} references to nonexistent route_id")
         if broken_service_refs > 0:
-            warnings.append(f"trips.txt contains {broken_service_refs} references to service_id not in calendar.txt")
+            warnings.append(f"trips.txt contains {broken_service_refs} references to service_id not in calendar files")
 
-        # 6. Check Expiry
+        # 6. Validate Stop Times (Foreign Keys, Monotonicity, and Times)
+        st_file = os.path.join(dir_path, "stop_times.txt")
+        broken_st_trip_refs = 0
+        broken_st_stop_refs = 0
+        sequence_errors = 0
+        time_monotonic_errors = 0
+        overnight_times_count = 0
+        total_st_rows = 0
+
+        # Track previous stop_sequence and departure_seconds per trip: trip_id -> (last_seq, last_dep_sec)
+        trip_last_st: Dict[str, Tuple[int, Optional[int]]] = {}
+
+        with open(st_file, mode="r", encoding="utf-8-sig", errors="replace") as f:
+            reader = csv.DictReader(f)
+            missing_cols = cls.REQUIRED_STOP_TIME_COLS - set(reader.fieldnames or [])
+            if missing_cols:
+                errors.append(f"stop_times.txt missing columns: {missing_cols}")
+            else:
+                for row_idx, row in enumerate(reader, start=2):
+                    total_st_rows += 1
+                    tid = row.get("trip_id", "").strip()
+                    sid = row.get("stop_id", "").strip()
+                    seq_str = row.get("stop_sequence", "").strip()
+                    arr_str = row.get("arrival_time", "").strip()
+                    dep_str = row.get("departure_time", "").strip()
+
+                    if tid not in trip_ids:
+                        broken_st_trip_refs += 1
+                    if sid not in stop_ids:
+                        broken_st_stop_refs += 1
+
+                    try:
+                        seq = int(seq_str)
+                    except ValueError:
+                        sequence_errors += 1
+                        seq = -1
+
+                    arr_sec = StopTime.parse_time(arr_str)
+                    dep_sec = StopTime.parse_time(dep_str)
+
+                    # Track 24:00+ overnight times
+                    if (arr_sec is not None and arr_sec >= 86400) or (dep_sec is not None and dep_sec >= 86400):
+                        overnight_times_count += 1
+
+                    # Check dwell time validity: arrival <= departure
+                    if arr_sec is not None and dep_sec is not None and dep_sec < arr_sec:
+                        time_monotonic_errors += 1
+
+                    # Check trip sequence monotonicity: strictly increasing sequences
+                    if tid in trip_last_st:
+                        prev_seq, prev_dep = trip_last_st[tid]
+                        if seq <= prev_seq:
+                            sequence_errors += 1
+                        # Check travel time monotonicity across stops: dep_prev <= arr_curr
+                        if prev_dep is not None and arr_sec is not None and arr_sec < prev_dep:
+                            time_monotonic_errors += 1
+
+                    trip_last_st[tid] = (seq, dep_sec if dep_sec is not None else arr_sec)
+
+        counts["stop_times"] = total_st_rows
+        counts["overnight_stop_times"] = overnight_times_count
+
+        if broken_st_trip_refs > 0:
+            errors.append(f"stop_times.txt contains {broken_st_trip_refs} references to nonexistent trip_id")
+        if broken_st_stop_refs > 0:
+            errors.append(f"stop_times.txt contains {broken_st_stop_refs} references to nonexistent stop_id")
+        if sequence_errors > 0:
+            warnings.append(f"stop_times.txt contains {sequence_errors} non-monotonic or malformed stop_sequence values")
+        if time_monotonic_errors > 0:
+            warnings.append(f"stop_times.txt contains {time_monotonic_errors} negative dwell times or backwards travel times")
+
+        # 7. Validate Transfers if present
+        transfers_file = os.path.join(dir_path, "transfers.txt")
+        if os.path.exists(transfers_file):
+            broken_transfers = 0
+            with open(transfers_file, mode="r", encoding="utf-8-sig", errors="replace") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    f_id = row.get("from_stop_id", "").strip()
+                    t_id = row.get("to_stop_id", "").strip()
+                    if f_id not in stop_ids or t_id not in stop_ids:
+                        broken_transfers += 1
+            if broken_transfers > 0:
+                warnings.append(f"transfers.txt contains {broken_transfers} references to nonexistent stop IDs")
+
+        # 8. Check Expiry
         today = date.today()
         is_expired = False
         if feed_end and feed_end < today:
@@ -201,4 +312,3 @@ class GTFSValidator:
             feed_end_date=feed_end,
             is_expired=is_expired,
         )
-

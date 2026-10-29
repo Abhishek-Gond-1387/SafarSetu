@@ -36,6 +36,24 @@ def plan_route(request: RoutePlanRequest):
             detail=f"Invalid departure time format: '{request.departure_time}'. Expected HH:MM or HH:MM:SS.",
         )
 
+    if request.origin_stop_id == request.destination_stop_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Origin and destination stops are identical.",
+        )
+
+    if ctx.dataset and request.origin_stop_id not in ctx.dataset.stops:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Origin stop '{request.origin_stop_id}' does not exist in dataset.",
+        )
+
+    if ctx.dataset and request.destination_stop_id not in ctx.dataset.stops:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Destination stop '{request.destination_stop_id}' does not exist in dataset.",
+        )
+
     criterion = RouteRankCriterion(request.criterion)
     raw_journeys, no_route_reason = ctx.router.plan_journey(
         origin_stop_id=request.origin_stop_id,
@@ -77,6 +95,7 @@ def plan_route(request: RoutePlanRequest):
                 total_duration_minutes=round(rj.total_duration_seconds / 60.0, 1),
                 total_walk_meters=round(rj.total_walk_meters, 1),
                 num_transfers=rj.num_transfers,
+                initial_wait_minutes=round(rj.initial_wait_seconds / 60.0, 1),
                 fare_inr=rj.total_fare_inr,
                 fare_complete=rj.fare_complete,
                 fare_note=None if rj.fare_complete else "Genuine dataset lacks fare information for these routes",
@@ -87,8 +106,9 @@ def plan_route(request: RoutePlanRequest):
             )
         )
 
-    # Collect freshness warnings
+    # Collect freshness warnings and calendar validity note
     freshness_warnings = []
+    cal_note = None
     if ctx.dataset and ctx.dataset.feed_info and ctx.dataset.feed_info.feed_end_date:
         if ctx.dataset.feed_info.feed_end_date < request.departure_date:
             freshness_warnings.append(
@@ -97,6 +117,13 @@ def plan_route(request: RoutePlanRequest):
                 f"Requested journey date is {request.departure_date.isoformat()}. "
                 "Results reflect historical schedule timetables."
             )
+            cal_note = (
+                f"Historical timetable: static GTFS calendar expired on "
+                f"{ctx.dataset.feed_info.feed_end_date.isoformat()}. "
+                "Evaluated using day-of-week service pattern."
+            )
+        else:
+            cal_note = f"Service calendar valid through {ctx.dataset.feed_info.feed_end_date.isoformat()}."
 
     return RoutePlanResponse(
         origin_stop_id=request.origin_stop_id,
@@ -106,6 +133,7 @@ def plan_route(request: RoutePlanRequest):
         criterion=request.criterion,
         journeys=journeys_out,
         data_freshness_warnings=freshness_warnings,
+        calendar_validity_note=cal_note,
         no_route_reason=no_route_reason,
     )
 

@@ -40,6 +40,7 @@ class RealtimeStatusResponse(BaseModel):
     cached_vehicles_count: int = Field(0, description="Number of valid live vehicles currently in memory cache")
     rejected_entities_count: int = Field(0, description="Entities rejected during latest poll due to invalid coordinates or format")
     feed_freshness: str = Field("unavailable", description="Freshness status: 'fresh', 'stale', or 'unavailable'")
+    live_tracking_verified: bool = Field(False, description="True only if live vehicle feeds are active and successfully tracking")
     error_category: Optional[str] = Field(None, description="Sanitized classification of latest error, if any")
     error_message: Optional[str] = Field(None, description="Sanitized error description with no credentials exposed")
 
