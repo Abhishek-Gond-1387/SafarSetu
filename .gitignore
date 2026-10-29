@@ -1,0 +1,104 @@
+# ==============================================================================
+# SafarSetu - Production Git Ignore Rules
+# ==============================================================================
+
+# ─── Secrets & Environment Variables ───────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.crt
+
+# ─── Large Transit Datasets & Raw Archives ─────────────────────────────────────
+# Do not commit raw GTFS archives, huge CSV files, or binary protobuf snapshots
+**/data/raw/*
+!**/data/raw/.gitkeep
+**/data/processed/*
+!**/data/processed/.gitkeep
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.pb
+
+# ─── Python Bytecode, Caches & Builds ──────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+parts/
+bin/
+var/
+develop-eggs/
+.installed.cfg
+manifest.in
+
+# ─── Python Virtual Environments ───────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# ─── Testing, Coverage & Type Checking ────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+nosetests.xml
+coverage.xml
+
+# ─── Node.js & Frontend Artifacts ─────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-store/
+.next/
+.nuxt/
+out/
+.turbo/
+.cache/
+
+# ─── IDE, Editors & OS Files ───────────────────────────────────────────────────
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ─── Logs & Temporary Files ───────────────────────────────────────────────────
+*.log
+logs/
+tmp/
+temp/
+
+# ─── Exploration & Probe Scripts ──────────────────────────────────────────────
+**/scripts/probe_*.py
+**/scripts/inspect_*.py
+

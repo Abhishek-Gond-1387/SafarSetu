@@ -1,0 +1,10 @@
+from fastapi import APIRouter
+from app.api.v1.endpoints import health, realtime, routes, stops, trips
+
+api_router = APIRouter()
+
+api_router.include_router(health.router, tags=["Health"])
+api_router.include_router(realtime.router, prefix="/realtime", tags=["Realtime"])
+api_router.include_router(stops.router, prefix="/stops", tags=["Stops"])
+api_router.include_router(routes.router, prefix="/routes", tags=["Routes"])
+api_router.include_router(trips.router, prefix="/trips", tags=["Trips"])

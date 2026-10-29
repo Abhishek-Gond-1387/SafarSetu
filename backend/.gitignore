@@ -1,0 +1,71 @@
+# ==============================================================================
+# SafarSetu Backend - Production Git Ignore Rules
+# ==============================================================================
+
+# ─── Secrets & Environment Variables ───────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.crt
+
+# ─── Large Transit Datasets & Raw Archives ─────────────────────────────────────
+# Do not commit raw GTFS archives, huge CSV files, or binary protobuf snapshots
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.pb
+
+# ─── Python Bytecode, Caches & Builds ──────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# ─── Python Virtual Environments ───────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ─── Testing, Coverage & Type Checking ────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+
+# ─── IDE, Editors & OS Files ───────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Logs & Temporary Files ───────────────────────────────────────────────────
+*.log
+logs/
+tmp/
+temp/
+
+# ─── Exploration & Probe Scripts ──────────────────────────────────────────────
+scripts/probe_*.py
+scripts/inspect_*.py
+scripts/download_mdb40.py
