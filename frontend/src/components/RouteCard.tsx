@@ -13,6 +13,7 @@ import {
   TrainTrack,
   Radio,
   ArrowRightLeft,
+  MapPin,
 } from 'lucide-react';
 import { Journey, JourneyLeg } from '../lib/api';
 
@@ -57,6 +58,10 @@ interface RouteCardProps {
   index: number;
   onSaveJourney: (journey: Journey) => void;
   isSaved?: boolean;
+  isSelected?: boolean;
+  onSelect?: () => void;
+  activeLegIndex?: number | null;
+  onSelectLeg?: (idx: number) => void;
 }
 
 export const RouteCard: React.FC<RouteCardProps> = ({
@@ -64,6 +69,10 @@ export const RouteCard: React.FC<RouteCardProps> = ({
   index,
   onSaveJourney,
   isSaved = false,
+  isSelected = false,
+  onSelect,
+  activeLegIndex = null,
+  onSelectLeg,
 }) => {
   const [expanded, setExpanded] = useState(index === 0);
   const [justSaved, setJustSaved] = useState(false);
@@ -129,11 +138,18 @@ export const RouteCard: React.FC<RouteCardProps> = ({
   };
 
   return (
-    <article className="route-card" aria-label={`Route option ${index + 1}`}>
+    <article
+      className={`route-card ${isSelected ? 'selected-on-map' : ''}`}
+      aria-label={`Route option ${index + 1}`}
+      onClick={() => onSelect?.()}
+    >
       {/* Top summary row */}
       <div
         className="route-card-header"
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => {
+          onSelect?.();
+          setExpanded(!expanded);
+        }}
         style={{ cursor: 'pointer' }}
       >
         <div className="route-headline">
@@ -146,6 +162,15 @@ export const RouteCard: React.FC<RouteCardProps> = ({
         </div>
 
         <div className="route-badges">
+          {isSelected && (
+            <span
+              className="badge badge-map-selected"
+              title="This route is highlighted on the live map"
+            >
+              <MapPin size={12} />
+              Viewing on Map
+            </span>
+          )}
           {getMetroBadge()}
           {getRankBadge()}
           <button
@@ -171,7 +196,14 @@ export const RouteCard: React.FC<RouteCardProps> = ({
       </div>
 
       {/* Visual Journey Flow Strip */}
-      <div className="journey-flow-strip" onClick={() => setExpanded(!expanded)} style={{ cursor: 'pointer' }}>
+      <div
+        className="journey-flow-strip"
+        onClick={() => {
+          onSelect?.();
+          setExpanded(!expanded);
+        }}
+        style={{ cursor: 'pointer' }}
+      >
         {journey.legs.map((leg, i) => {
           const isWalking = leg.mode === 'walking' || leg.mode === 'walk';
           const isMetro = leg.mode === 'metro';
@@ -184,24 +216,49 @@ export const RouteCard: React.FC<RouteCardProps> = ({
                 </span>
               )}
               {isWalking ? (
-                <span className="flow-segment walk" title={`Walk ${Math.round(leg.distance_meters || 0)}m`}>
+                <span
+                  className={`flow-segment walk ${activeLegIndex === i ? 'active-leg' : ''}`}
+                  title={`Walk ${Math.round(leg.distance_meters || 0)}m (click to focus on map)`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelect?.();
+                    onSelectLeg?.(i);
+                  }}
+                >
                   <Footprints size={12} /> Walk
                 </span>
               ) : isMetro && metroStyle ? (
                 <span
-                  className="flow-segment metro"
+                  className={`flow-segment metro ${activeLegIndex === i ? 'active-leg' : ''}`}
                   style={{
                     backgroundColor: `${metroStyle.bg}18`,
                     borderColor: metroStyle.bg,
                     color: metroStyle.bg === '#eab308' ? '#854d0e' : metroStyle.bg,
+                    outline: activeLegIndex === i ? `2px solid ${metroStyle.bg}` : 'none',
                   }}
-                  title={`${metroStyle.name}: ${leg.from_stop_name} to ${leg.to_stop_name}`}
+                  title={`${metroStyle.name}: ${leg.from_stop_name} to ${leg.to_stop_name} (click to focus on map)`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelect?.();
+                    onSelectLeg?.(i);
+                  }}
                 >
                   <TrainTrack size={12} />
                   {metroStyle.name}
                 </span>
               ) : (
-                <span className="flow-segment bus" title={`Bus ${leg.route_short_name || leg.route_id}`}>
+                <span
+                  className={`flow-segment bus ${activeLegIndex === i ? 'active-leg' : ''}`}
+                  style={{
+                    outline: activeLegIndex === i ? '2px solid #0f766e' : 'none',
+                  }}
+                  title={`Bus ${leg.route_short_name || leg.route_id} (click to focus on map)`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelect?.();
+                    onSelectLeg?.(i);
+                  }}
+                >
                   <Bus size={12} />
                   {leg.route_short_name ? `Bus ${leg.route_short_name}` : 'Bus'}
                 </span>

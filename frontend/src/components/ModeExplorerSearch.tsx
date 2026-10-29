@@ -19,6 +19,7 @@ import {
   Compass,
   Sparkles,
   LocateFixed,
+  LocateOff,
   Crosshair,
   AlertCircle,
 } from 'lucide-react';
@@ -54,7 +55,12 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
   isLoading,
 }) => {
   // Location Permission & Geolocation State
-  const [locationStep, setLocationStep] = useState<'prompt' | 'requesting' | 'detected' | 'manual'>('prompt');
+  const [isLocationDisabled, setIsLocationDisabled] = useState<boolean>(() => {
+    return localStorage.getItem('safarsetu_location_disabled') === 'true';
+  });
+  const [locationStep, setLocationStep] = useState<'prompt' | 'requesting' | 'detected' | 'manual'>(() => {
+    return localStorage.getItem('safarsetu_location_disabled') === 'true' ? 'manual' : 'prompt';
+  });
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [detectedCoords, setDetectedCoords] = useState<{ lat: number; lon: number } | null>(null);
@@ -91,8 +97,11 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
   const [travelDate, setTravelDate] = useState(todayStr);
   const [travelTime, setTravelTime] = useState(timeStr);
 
-  // Check if browser already granted location on mount
+  // Check if browser already granted location on mount (unless user disabled it)
   useEffect(() => {
+    if (localStorage.getItem('safarsetu_location_disabled') === 'true') {
+      return;
+    }
     if (navigator.permissions && navigator.permissions.query) {
       navigator.permissions.query({ name: 'geolocation' }).then((status) => {
         if (status.state === 'granted') {
@@ -104,6 +113,23 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
     }
   }, []);
 
+  // Disable location completely
+  const handleDisableLocation = () => {
+    setIsLocationDisabled(true);
+    localStorage.setItem('safarsetu_location_disabled', 'true');
+    setDetectedCoords(null);
+    setStopDistanceMeters(null);
+    setLocationStep('manual');
+    setLocationError(null);
+  };
+
+  // Enable location and request current coordinates
+  const handleEnableLocation = () => {
+    setIsLocationDisabled(false);
+    localStorage.removeItem('safarsetu_location_disabled');
+    handleRequestLocation();
+  };
+
   // Request browser geolocation
   const handleRequestLocation = () => {
     if (!navigator.geolocation) {
@@ -114,6 +140,8 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
 
     setIsLocating(true);
     setLocationError(null);
+    setIsLocationDisabled(false);
+    localStorage.removeItem('safarsetu_location_disabled');
 
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -355,7 +383,7 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
   return (
     <div className="search-card mode-explorer-card">
       {/* ── STEP 0: Location Permission Prompt (Shown first before destination) ── */}
-      {locationStep === 'prompt' && (
+      {!isLocationDisabled && locationStep === 'prompt' && (
         <div className="location-permission-card">
           <div className="location-permission-icon-wrap">
             <LocateFixed size={26} color="#0f766e" />
@@ -388,9 +416,11 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
               <button
                 type="button"
                 className="btn-location-skip"
-                onClick={() => setLocationStep('manual')}
+                onClick={handleDisableLocation}
+                title="Do not use device location"
               >
-                Enter Starting Point Manually
+                <LocateOff size={14} />
+                <span>Disable Location (Manual Mode)</span>
               </button>
             </div>
           </div>
@@ -406,32 +436,86 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
       )}
 
       {/* ── Active Origin Banner (When Location is Detected) ── */}
-      {locationStep === 'detected' && originStop && (
+      {!isLocationDisabled && locationStep === 'detected' && originStop && (
         <div className="location-detected-banner">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
             <div className="live-gps-dot" />
             <span>
-              Starting from: <strong>{originStop.stop_name}</strong>
-              {stopDistanceMeters ? ` (~${Math.round(stopDistanceMeters)}m from your GPS)` : ''}
+              Live GPS Origin: <strong>{originStop.stop_name}</strong>
+              {stopDistanceMeters ? ` (~${Math.round(stopDistanceMeters)}m from your location)` : ''}
             </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <button
+              type="button"
+              className="btn-change-location"
+              onClick={() => setLocationStep('manual')}
+            >
+              Change Stop
+            </button>
+            <button
+              type="button"
+              className="btn-disable-location"
+              onClick={handleDisableLocation}
+              title="Turn off GPS location and enter starting point manually"
+            >
+              <LocateOff size={13} />
+              <span>Disable Location</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Disabled Location Notice with Re-Enable Action ── */}
+      {isLocationDisabled && (
+        <div className="location-disabled-banner">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: '#475569' }}>
+            <LocateOff size={15} color="#64748b" />
+            <span>Live location is <strong>Disabled</strong>. You can enter any starting stop manually.</span>
           </div>
           <button
             type="button"
-            className="btn-change-location"
-            onClick={() => setLocationStep('manual')}
+            className="btn-enable-location"
+            onClick={handleEnableLocation}
+            title="Enable live GPS location"
           >
-            Change Starting Stop
+            <LocateFixed size={13} />
+            <span>Enable Location</span>
           </button>
         </div>
       )}
 
       {/* ── Header: Where do you want to go? ── */}
       <div className="explorer-header">
-        <h2 className="search-title" style={{ marginBottom: '0.25rem' }}>
-          <Compass size={20} color="var(--primary)" />
-          <span>Where do you want to go?</span>
-        </h2>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <h2 className="search-title" style={{ margin: 0 }}>
+            <Compass size={20} color="var(--primary)" />
+            <span>Where do you want to go?</span>
+          </h2>
+
+          {isLocationDisabled ? (
+            <button
+              type="button"
+              className="location-pill-btn off"
+              onClick={handleEnableLocation}
+              title="Location tracking is off. Click to enable GPS."
+            >
+              <LocateOff size={12} />
+              <span>Location: Disabled</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="location-pill-btn on"
+              onClick={handleDisableLocation}
+              title="Location tracking is active. Click to disable."
+            >
+              <LocateFixed size={12} />
+              <span>Location: Active</span>
+            </button>
+          )}
+        </div>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
           Enter any landmark, monument, or college (e.g. <strong>MAIT</strong>, <strong>DU</strong>, <strong>Red Fort</strong>) to view all transportation modes and route paths.
         </p>
       </div>
@@ -710,11 +794,19 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
                     ))}
                   </div>
 
-                  {isSelected && (
-                    <div className="selected-indicator">
-                      <CheckCircle2 size={15} color="#0f766e" /> Selected Path (Viewing Routes Below)
-                    </div>
-                  )}
+                  <div className="mode-card-footer">
+                    {isSelected ? (
+                      <div className="selected-indicator">
+                        <CheckCircle2 size={14} color="#0f766e" />
+                        <span>Active Mode</span>
+                      </div>
+                    ) : (
+                      <div className="unselected-prompt">
+                        <span>Select Mode</span>
+                        <ChevronRight size={13} />
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -723,16 +815,21 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
           {/* ── Stop Selection According to Chosen Mode ───────────────────────── */}
           {currentModeOption && (
             <div className="mode-customization-panel">
-              <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Layers size={16} color="var(--primary)" />
-                Choose Stops for {currentModeOption.title}
-              </h4>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Layers size={16} color="var(--primary)" />
+                  Customize Stops &amp; Route Optimization for {currentModeOption.title}
+                </h4>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Auto-optimized candidate stations &amp; stops
+                </span>
+              </div>
 
-              <div className="custom-stops-grid">
+              <div className="custom-stops-row">
                 {/* Boarding Stop Choice */}
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label" style={{ fontSize: '0.8rem' }}>
-                    Boarding Stop / Station
+                    1. Boarding Stop / Station
                   </label>
                   <select
                     className="form-input"
@@ -771,7 +868,7 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
                 {/* Destination Stop Choice */}
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label" style={{ fontSize: '0.8rem' }}>
-                    Alighting Stop / Station
+                    2. Alighting Stop / Station
                   </label>
                   <select
                     className="form-input"
@@ -806,38 +903,41 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
                     )}
                   </select>
                 </div>
-              </div>
 
-              {/* Optimization Parameters (Distance vs Fare vs Balanced) */}
-              <div style={{ marginTop: '0.9rem' }}>
-                <span className="form-label" style={{ fontSize: '0.8rem', display: 'block', marginBottom: '0.35rem' }}>
-                  Optimization Parameter
-                </span>
-                <div className="optimization-btn-group">
-                  <button
-                    type="button"
-                    className={`opt-btn ${selectedCriterion === 'fastest' ? 'active' : ''}`}
-                    onClick={() => handleCriterionChange('fastest')}
-                  >
-                    <Zap size={14} />
-                    <span>Distance & Speed (Fastest)</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`opt-btn ${selectedCriterion === 'cheapest' ? 'active' : ''}`}
-                    onClick={() => handleCriterionChange('cheapest')}
-                  >
-                    <Coins size={14} />
-                    <span>Fare Optimization (Cheapest)</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`opt-btn ${selectedCriterion === 'balanced' ? 'active' : ''}`}
-                    onClick={() => handleCriterionChange('balanced')}
-                  >
-                    <Scale size={14} />
-                    <span>Balanced (Least Walking)</span>
-                  </button>
+                {/* Optimization Parameters (Distance vs Fare vs Balanced) */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem' }}>
+                    3. Prioritize Optimization
+                  </label>
+                  <div className="optimization-btn-group">
+                    <button
+                      type="button"
+                      className={`opt-btn ${selectedCriterion === 'fastest' ? 'active' : ''}`}
+                      onClick={() => handleCriterionChange('fastest')}
+                      title="Prioritize lowest total travel duration"
+                    >
+                      <Zap size={13} />
+                      <span>Fastest</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`opt-btn ${selectedCriterion === 'cheapest' ? 'active' : ''}`}
+                      onClick={() => handleCriterionChange('cheapest')}
+                      title="Prioritize lowest transit fare"
+                    >
+                      <Coins size={13} />
+                      <span>Cheapest</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`opt-btn ${selectedCriterion === 'balanced' ? 'active' : ''}`}
+                      onClick={() => handleCriterionChange('balanced')}
+                      title="Minimize pedestrian transfers"
+                    >
+                      <Scale size={13} />
+                      <span>Balanced</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 

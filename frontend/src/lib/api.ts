@@ -70,12 +70,26 @@ export interface StopsSearchResponse {
   results: StopItem[];
 }
 
+export interface LegStopDetail {
+  stop_id: string;
+  stop_name: string;
+  lat: number;
+  lon: number;
+  is_board: boolean;
+  is_alight: boolean;
+  mode: string;
+}
+
 export interface JourneyLeg {
   mode: 'transit' | 'walking' | 'bus' | 'walk' | 'metro';
   from_stop_id: string;
   to_stop_id: string;
   from_stop_name: string;
   to_stop_name: string;
+  from_stop_lat?: number | null;
+  from_stop_lon?: number | null;
+  to_stop_lat?: number | null;
+  to_stop_lon?: number | null;
   departure_time: string;
   arrival_time: string;
   duration_minutes: number;
@@ -90,6 +104,8 @@ export interface JourneyLeg {
   fare_note?: string;
   intermediate_stops?: string[];
   source_id?: string;
+  path_coordinates?: [number, number][];
+  stops_detail?: LegStopDetail[];
 }
 
 export interface MetroLineStatus {
@@ -304,6 +320,25 @@ export const SafarSetuAPI = {
 
   async getMetroRealtimeStatus(): Promise<MetroNetworkStatusResponse> {
     return fetchJSON<MetroNetworkStatusResponse>('/realtime/metro');
+  },
+
+  async getVehicles(params: { route_id?: string; limit?: number } = {}): Promise<{
+    total: number;
+    feed_freshness: string;
+    results: Array<{
+      vehicle_id: string;
+      latitude: number;
+      longitude: number;
+      route_id?: string;
+      route_long_name?: string;
+      speed_kmh?: number;
+    }>;
+  }> {
+    const q = new URLSearchParams();
+    if (params.route_id) q.set('route_id', params.route_id);
+    if (params.limit) q.set('limit', String(params.limit));
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return fetchJSON(`/realtime/vehicles${qs}`);
   },
 
   // User Profile & Preferences

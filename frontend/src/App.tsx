@@ -7,6 +7,7 @@ import { DataFreshnessBanner } from './components/DataFreshnessBanner';
 import { JourneySearch } from './components/JourneySearch';
 import { ModeExplorerSearch } from './components/ModeExplorerSearch';
 import { RouteCard } from './components/RouteCard';
+import { RouteMap } from './components/RouteMap';
 import { SavedJourneysModal } from './components/SavedJourneysModal';
 import { PreferencesModal } from './components/PreferencesModal';
 import { FeedbackModal } from './components/FeedbackModal';
@@ -31,6 +32,7 @@ import {
   ShieldAlert,
   ServerCrash,
   Navigation,
+  MapPin,
 } from 'lucide-react';
 
 /* ──────────────────────────────────────────────────────────
@@ -103,6 +105,13 @@ const PlannerPage: React.FC<{
   onOpenAccount,
 }) => {
   const [searchMode, setSearchMode] = useState<'explorer' | 'standard'>('explorer');
+  const [selectedJourneyIndex, setSelectedJourneyIndex] = useState<number>(0);
+  const [selectedLegIndex, setSelectedLegIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    setSelectedJourneyIndex(0);
+    setSelectedLegIndex(null);
+  }, [routePlan]);
 
   return (
     <div className="app-layout">
@@ -133,73 +142,37 @@ const PlannerPage: React.FC<{
           </div>
         )}
 
-        <div className="planner-grid">
-          {/* Left Column: Journey Planner Form */}
-          <aside>
-            <div className="search-mode-tabs">
-              <button
-                type="button"
-                className={`search-mode-tab ${searchMode === 'explorer' ? 'active' : ''}`}
-                onClick={() => setSearchMode('explorer')}
-              >
-                <Compass size={16} /> Destination & Modes
-              </button>
-              <button
-                type="button"
-                className={`search-mode-tab ${searchMode === 'standard' ? 'active' : ''}`}
-                onClick={() => setSearchMode('standard')}
-              >
-                <Navigation size={16} /> Stop-to-Stop
-              </button>
-            </div>
+        {/* Mode Switcher Tabs */}
+        <div className="search-mode-switcher-bar" style={{ marginBottom: '1.25rem' }}>
+          <div className="search-mode-tabs" style={{ maxWidth: '480px', margin: '0 auto 1.5rem auto' }}>
+            <button
+              type="button"
+              className={`search-mode-tab ${searchMode === 'explorer' ? 'active' : ''}`}
+              onClick={() => setSearchMode('explorer')}
+            >
+              <Compass size={16} /> Destination &amp; Multi-Modal Modes
+            </button>
+            <button
+              type="button"
+              className={`search-mode-tab ${searchMode === 'standard' ? 'active' : ''}`}
+              onClick={() => setSearchMode('standard')}
+            >
+              <Navigation size={16} /> Stop-to-Stop Planner
+            </button>
+          </div>
+        </div>
 
-            {searchMode === 'explorer' ? (
-              <ModeExplorerSearch
-                onPlanRoute={onPlanRoute}
-                isLoading={isPlanning}
-              />
-            ) : (
-              <JourneySearch
-                onPlanRoute={onPlanRoute}
-                isLoading={isPlanning}
-                initialOrigin={selectedOrigin}
-                initialDestination={selectedDest}
-              />
-            )}
+        {searchMode === 'explorer' ? (
+          /* ── Explorer Mode: Full-Width Command Card with Side-by-Side Map Results ── */
+          <div className="explorer-view-wrapper">
+            <ModeExplorerSearch
+              onPlanRoute={onPlanRoute}
+              isLoading={isPlanning}
+            />
 
-            {/* Delhi Transit System Quick Facts */}
-            {health && (() => {
-              const primary = health.data_sources?.[0] || health.sources?.[0];
-              return (
-                <div
-                  style={{
-                    marginTop: '1.25rem',
-                    padding: '1rem',
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-md)',
-                    fontSize: '0.82rem',
-                  }}
-                >
-                  <div style={{ fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
-                    Transit System Snapshot
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', color: 'var(--text-muted)' }}>
-                    <div>Stops: <strong style={{ color: 'var(--text-main)' }}>{primary?.stops_count?.toLocaleString() || '6,342'}</strong></div>
-                    <div>Routes: <strong style={{ color: 'var(--text-main)' }}>{primary?.routes_count?.toLocaleString() || '2,964'}</strong></div>
-                    <div>Trips: <strong style={{ color: 'var(--text-main)' }}>{primary?.trips_count?.toLocaleString() || '78,515'}</strong></div>
-                    <div>Graph Nodes: <strong style={{ color: 'var(--text-main)' }}>{health.graph_nodes?.toLocaleString() || '11,466'}</strong></div>
-                  </div>
-                </div>
-              );
-            })()}
-          </aside>
-
-          {/* Right Column: Comparison & Results */}
-          <section className="results-container">
             {/* Calendar Validity Warning if any */}
             {routePlan?.calendar_validity_note && (
-              <div className="alert-box alert-info" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div className="alert-box alert-info" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1.25rem' }}>
                 <Clock size={16} color="var(--secondary)" />
                 <span>{routePlan.calendar_validity_note}</span>
               </div>
@@ -207,7 +180,7 @@ const PlannerPage: React.FC<{
 
             {/* Data freshness warnings from engine */}
             {routePlan?.data_freshness_warnings && routePlan.data_freshness_warnings.length > 0 && (
-              <div className="alert-box alert-info" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <div className="alert-box alert-info" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '1rem' }}>
                 {routePlan.data_freshness_warnings.map((w, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <AlertTriangle size={15} color="var(--accent-dark)" />
@@ -217,56 +190,222 @@ const PlannerPage: React.FC<{
               </div>
             )}
 
-            {/* Route Planning Error or No Feasible Route */}
+            {/* Route Planning Error */}
             {planError && (
-              <div className="alert-box alert-danger">
+              <div className="alert-box alert-danger" style={{ marginTop: '1.25rem' }}>
                 <ShieldAlert size={18} style={{ display: 'inline', marginRight: 8, verticalAlign: 'middle' }} />
                 <strong>Routing Advisory:</strong> {planError}
               </div>
             )}
 
-            {/* Results Display */}
+            {/* Results Display with Side Map */}
             {routePlan && routePlan.journeys.length > 0 ? (
-              <>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: '0.25rem',
-                  }}
-                >
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>
-                    Found {routePlan.journeys.length} Journey Option{routePlan.journeys.length > 1 ? 's' : ''}
-                  </h3>
-                  <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                    Ranked by {routePlan.criterion}
-                  </span>
+              <div className="results-layout-with-map" style={{ marginTop: '1.5rem' }}>
+                {/* Left Column: Route Cards */}
+                <div className="routes-list-column">
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: '0.75rem',
+                      paddingBottom: '0.6rem',
+                      borderBottom: '1.5px solid var(--border)',
+                    }}
+                  >
+                    <div>
+                      <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+                        {routePlan.journeys.length} Route Choice{routePlan.journeys.length > 1 ? 's' : ''} Available
+                      </h3>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        Ranked by {routePlan.criterion} &bull; Click any card to highlight route on the map
+                      </span>
+                    </div>
+                  </div>
+
+                  {routePlan.journeys.map((journey, idx) => (
+                    <RouteCard
+                      key={idx}
+                      journey={journey}
+                      index={idx}
+                      onSaveJourney={onSaveJourney}
+                      isSelected={selectedJourneyIndex === idx}
+                      onSelect={() => {
+                        setSelectedJourneyIndex(idx);
+                        setSelectedLegIndex(null);
+                      }}
+                      activeLegIndex={selectedJourneyIndex === idx ? selectedLegIndex : null}
+                      onSelectLeg={(legIdx) => {
+                        setSelectedJourneyIndex(idx);
+                        setSelectedLegIndex(legIdx);
+                      }}
+                    />
+                  ))}
                 </div>
 
-                {routePlan.journeys.map((journey, idx) => (
-                  <RouteCard
-                    key={idx}
-                    journey={journey}
-                    index={idx}
-                    onSaveJourney={onSaveJourney}
-                  />
-                ))}
-              </>
-            ) : !isPlanning && !planError ? (
-              <div className="empty-state">
-                <div className="empty-state-icon">
-                  <Compass size={28} />
+                {/* Right Column: Sticky Live Route Map */}
+                <div className="map-side-column">
+                  <div className="map-sticky-card">
+                    <div className="map-card-bar">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div className="pulse-dot" style={{ background: '#10b981', width: 8, height: 8 }} />
+                        <strong style={{ fontSize: '0.88rem', color: 'var(--text-main)' }}>Interactive Route Map</strong>
+                      </div>
+                      <span style={{ fontSize: '0.78rem', background: '#e2e8f0', color: '#1e293b', padding: '0.2rem 0.6rem', borderRadius: '4px', fontWeight: 700 }}>
+                        Viewing Route {selectedJourneyIndex + 1} of {routePlan.journeys.length}
+                      </span>
+                    </div>
+                    <RouteMap
+                      journey={routePlan.journeys[selectedJourneyIndex] || null}
+                      activeLegIndex={selectedLegIndex}
+                      onSelectLeg={(legIdx) => setSelectedLegIndex(legIdx)}
+                    />
+                  </div>
                 </div>
-                <h3>Plan your transit route across Delhi &amp; NCR</h3>
-                <p style={{ maxWidth: '440px', margin: '0 auto', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                  Search for verified bus stops like <strong>Kashmere Gate</strong>, <strong>AIIMS</strong>, or <strong>Anand Vihar</strong>.
-                  SafarSetu computes timetable-accurate direct and multi-transfer journeys with clear pedestrian transfer links.
-                </p>
               </div>
             ) : null}
-          </section>
-        </div>
+          </div>
+        ) : (
+          /* ── Standard Mode: Classic 2-Column Stop-to-Stop Planner ── */
+          <div className="planner-grid">
+            <aside>
+              <JourneySearch
+                onPlanRoute={onPlanRoute}
+                isLoading={isPlanning}
+                initialOrigin={selectedOrigin}
+                initialDestination={selectedDest}
+              />
+
+              {/* Delhi Transit System Quick Facts */}
+              {health && (() => {
+                const primary = health.data_sources?.[0] || health.sources?.[0];
+                return (
+                  <div
+                    style={{
+                      marginTop: '1.25rem',
+                      padding: '1rem',
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: '0.82rem',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+                      Transit System Snapshot
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', color: 'var(--text-muted)' }}>
+                      <div>Stops: <strong style={{ color: 'var(--text-main)' }}>{primary?.stops_count?.toLocaleString() || '6,342'}</strong></div>
+                      <div>Routes: <strong style={{ color: 'var(--text-main)' }}>{primary?.routes_count?.toLocaleString() || '2,964'}</strong></div>
+                      <div>Trips: <strong style={{ color: 'var(--text-main)' }}>{primary?.trips_count?.toLocaleString() || '78,515'}</strong></div>
+                      <div>Graph Nodes: <strong style={{ color: 'var(--text-main)' }}>{health.graph_nodes?.toLocaleString() || '11,466'}</strong></div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </aside>
+
+            {/* Right Column: Comparison & Results */}
+            <section className="results-container">
+              {routePlan?.calendar_validity_note && (
+                <div className="alert-box alert-info" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Clock size={16} color="var(--secondary)" />
+                  <span>{routePlan.calendar_validity_note}</span>
+                </div>
+              )}
+
+              {routePlan?.data_freshness_warnings && routePlan.data_freshness_warnings.length > 0 && (
+                <div className="alert-box alert-info" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  {routePlan.data_freshness_warnings.map((w, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <AlertTriangle size={15} color="var(--accent-dark)" />
+                      <span>{w}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {planError && (
+                <div className="alert-box alert-danger">
+                  <ShieldAlert size={18} style={{ display: 'inline', marginRight: 8, verticalAlign: 'middle' }} />
+                  <strong>Routing Advisory:</strong> {planError}
+                </div>
+              )}
+
+              {routePlan && routePlan.journeys.length > 0 ? (
+                <div className="results-layout-with-map">
+                  <div className="routes-list-column">
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginBottom: '0.4rem',
+                        paddingBottom: '0.4rem',
+                        borderBottom: '1px solid var(--border)',
+                      }}
+                    >
+                      <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>
+                        Found {routePlan.journeys.length} Journey Option{routePlan.journeys.length > 1 ? 's' : ''}
+                      </h3>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        Ranked by {routePlan.criterion}
+                      </span>
+                    </div>
+
+                    {routePlan.journeys.map((journey, idx) => (
+                      <RouteCard
+                        key={idx}
+                        journey={journey}
+                        index={idx}
+                        onSaveJourney={onSaveJourney}
+                        isSelected={selectedJourneyIndex === idx}
+                        onSelect={() => {
+                          setSelectedJourneyIndex(idx);
+                          setSelectedLegIndex(null);
+                        }}
+                        activeLegIndex={selectedJourneyIndex === idx ? selectedLegIndex : null}
+                        onSelectLeg={(legIdx) => {
+                          setSelectedJourneyIndex(idx);
+                          setSelectedLegIndex(legIdx);
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="map-side-column">
+                    <div className="map-sticky-card">
+                      <div className="map-card-bar">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                          <div className="pulse-dot" style={{ background: '#10b981', width: 8, height: 8 }} />
+                          <strong style={{ fontSize: '0.85rem', color: 'var(--text-main)' }}>Live Route Map</strong>
+                        </div>
+                        <span style={{ fontSize: '0.75rem', background: '#e2e8f0', color: '#334155', padding: '0.2rem 0.55rem', borderRadius: '4px', fontWeight: 600 }}>
+                          Route {selectedJourneyIndex + 1} of {routePlan.journeys.length}
+                        </span>
+                      </div>
+                      <RouteMap
+                        journey={routePlan.journeys[selectedJourneyIndex] || null}
+                        activeLegIndex={selectedLegIndex}
+                        onSelectLeg={(legIdx) => setSelectedLegIndex(legIdx)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : !isPlanning && !planError ? (
+                <div className="empty-state">
+                  <div className="empty-state-icon">
+                    <Compass size={28} />
+                  </div>
+                  <h3>Plan your transit route across Delhi &amp; NCR</h3>
+                  <p style={{ maxWidth: '440px', margin: '0 auto', fontSize: '0.9rem', lineHeight: '1.5' }}>
+                    Search for verified bus stops like <strong>Kashmere Gate</strong>, <strong>AIIMS</strong>, or <strong>Anand Vihar</strong>.
+                    SafarSetu computes timetable-accurate direct and multi-transfer journeys with clear pedestrian transfer links.
+                  </p>
+                </div>
+              ) : null}
+            </section>
+          </div>
+        )}
       </main>
 
       {/* Modals */}

@@ -70,7 +70,55 @@ backend/
 
 ---
 
-## 2. Transit Data Provenance & Real-Time Feed
+## 2. End-to-End System Workflow
+
+```mermaid
+flowchart TD
+    subgraph UI ["1. Commuter Frontend (React + Vite + Leaflet/Mapbox)"]
+        A["Enter Destination Landmark (e.g. MAIT, DU, Red Fort, CP)"]
+        B{"Location Permission"}
+        C["GPS Enabled: Auto-detect closest stops"]
+        D["GPS Disabled: Enter manual starting stop"]
+        E["Mode Explorer (Metro | Bus | Multimodal | Auto | Cab)"]
+        F["Customize Stops & Prioritize (Fastest | Cheapest | Balanced)"]
+        G["Split Results & Live Map (Synchronized Route Cards + Mapbox Polyline)"]
+        H["Optional: Real-Time Live Bus Fleet Layer (VehiclePositions.pb)"]
+    end
+
+    subgraph Backend ["2. SafarSetu Engine (FastAPI + In-Memory Graph Router)"]
+        I["Landmark Resolver (DELHI_LANDMARK_ALIASES + Fuzzy Search)"]
+        J["Nearby Stop Locator (/api/v1/stops/nearby - Haversine Index)"]
+        K["Multimodal Routing Engine (/api/v1/routes/plan)"]
+        L["Official Fare Calculator (DMRC & DTC Distance Slabs)"]
+        M["Path Geometry & Stop Sequence Assembler"]
+    end
+
+    subgraph Data ["3. Transit Datasets & Live Feeds"]
+        N[("Static DTC GTFS (mdb-1262) - 6,604 Stops, 83k Trips")]
+        O[("DMRC Metro Network - 10 Lines, Interchanges")]
+        P["Delhi OTD Real-Time Feed (VehiclePositions.pb)"]
+    end
+
+    A --> I
+    B -- "Allowed" --> C
+    B -- "Disabled" --> D
+    C --> J
+    I --> E
+    D --> E
+    E --> F
+    F --> K
+    K --> L
+    L --> M
+    M --> G
+    K --- N
+    K --- O
+    G -.-> H
+    H -.-> P
+```
+
+---
+
+## 3. Transit Data Provenance & Real-Time Feed
 
 1. **Static GTFS Data (`mdb-1262`)**:
    - Provider: Delhi Transport Corporation (DTC) / DIMTS Bus Network.
@@ -84,7 +132,7 @@ backend/
 
 ---
 
-## 3. Configuration & Credentials
+## 4. Configuration & Credentials
 
 Set up your `.env` file (configured via `.env.example`):
 
@@ -110,9 +158,9 @@ OTD_REALTIME_STALE_THRESHOLD_SECONDS=300
 
 ---
 
-## 4. Running the Pipeline & Server
+## 5. Running the Pipeline & Server
 
-### Step 1: Run Full Automated Test Suite (39 Tests)
+### Step 1: Run Full Automated Test Suite
 ```bash
 pytest -v
 ```
@@ -133,7 +181,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ---
 
-## 5. Key Endpoints
+## 6. Key Endpoints
 
 - **Interactive Swagger Documentation:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - **System & Real-Time Health:** `GET /health` or `GET /api/v1/health`

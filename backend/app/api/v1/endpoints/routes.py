@@ -75,28 +75,81 @@ def plan_route(request: RoutePlanRequest):
 
     journeys_out = []
     for rj in ranked_journeys:
-        legs_out = [
-            JourneyLegOut(
-                mode=leg.mode.value,
-                from_stop_id=leg.from_stop_id,
-                to_stop_id=leg.to_stop_id,
-                from_stop_name=leg.from_stop_name,
-                to_stop_name=leg.to_stop_name,
-                departure_time=leg.departure_time_str,
-                arrival_time=leg.arrival_time_str,
-                duration_minutes=round(leg.duration_seconds / 60.0, 1),
-                route_id=leg.route_id,
-                route_short_name=leg.route_short_name,
-                route_long_name=leg.route_long_name,
-                trip_id=leg.trip_id,
-                headsign=leg.headsign,
-                distance_meters=leg.distance_meters,
-                distance_type=leg.walk_distance_type,
-                fare_inr=leg.fare_inr,
-                source_id=leg.source_id,
+        legs_out = []
+        for leg in rj.legs:
+            from_s = ctx.dataset.stops.get(leg.from_stop_id) if ctx.dataset else None
+            to_s = ctx.dataset.stops.get(leg.to_stop_id) if ctx.dataset else None
+
+            path_coords = []
+            stops_detail = []
+
+            if from_s:
+                path_coords.append([from_s.stop_lat, from_s.stop_lon])
+                stops_detail.append({
+                    "stop_id": from_s.stop_id,
+                    "stop_name": from_s.stop_name,
+                    "lat": from_s.stop_lat,
+                    "lon": from_s.stop_lon,
+                    "is_board": True,
+                    "is_alight": False,
+                    "mode": leg.mode.value,
+                })
+
+            if ctx.dataset and leg.intermediate_stops:
+                for sid in leg.intermediate_stops:
+                    mid_s = ctx.dataset.stops.get(sid)
+                    if mid_s:
+                        path_coords.append([mid_s.stop_lat, mid_s.stop_lon])
+                        stops_detail.append({
+                            "stop_id": mid_s.stop_id,
+                            "stop_name": mid_s.stop_name,
+                            "lat": mid_s.stop_lat,
+                            "lon": mid_s.stop_lon,
+                            "is_board": False,
+                            "is_alight": False,
+                            "mode": leg.mode.value,
+                        })
+
+            if to_s:
+                if not path_coords or path_coords[-1] != [to_s.stop_lat, to_s.stop_lon]:
+                    path_coords.append([to_s.stop_lat, to_s.stop_lon])
+                stops_detail.append({
+                    "stop_id": to_s.stop_id,
+                    "stop_name": to_s.stop_name,
+                    "lat": to_s.stop_lat,
+                    "lon": to_s.stop_lon,
+                    "is_board": False,
+                    "is_alight": True,
+                    "mode": leg.mode.value,
+                })
+
+            legs_out.append(
+                JourneyLegOut(
+                    mode=leg.mode.value,
+                    from_stop_id=leg.from_stop_id,
+                    to_stop_id=leg.to_stop_id,
+                    from_stop_name=leg.from_stop_name,
+                    to_stop_name=leg.to_stop_name,
+                    from_stop_lat=from_s.stop_lat if from_s else None,
+                    from_stop_lon=from_s.stop_lon if from_s else None,
+                    to_stop_lat=to_s.stop_lat if to_s else None,
+                    to_stop_lon=to_s.stop_lon if to_s else None,
+                    departure_time=leg.departure_time_str,
+                    arrival_time=leg.arrival_time_str,
+                    duration_minutes=round(leg.duration_seconds / 60.0, 1),
+                    route_id=leg.route_id,
+                    route_short_name=leg.route_short_name,
+                    route_long_name=leg.route_long_name,
+                    trip_id=leg.trip_id,
+                    headsign=leg.headsign,
+                    distance_meters=leg.distance_meters,
+                    distance_type=leg.walk_distance_type,
+                    fare_inr=leg.fare_inr,
+                    source_id=leg.source_id,
+                    path_coordinates=path_coords,
+                    stops_detail=stops_detail,
+                )
             )
-            for leg in rj.legs
-        ]
 
         journeys_out.append(
             JourneyOut(

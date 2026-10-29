@@ -66,12 +66,26 @@ class RoutePlanRequest(BaseModel):
         return self
 
 
+class LegStopDetail(BaseModel):
+    stop_id: str
+    stop_name: str
+    lat: float
+    lon: float
+    is_board: bool = False
+    is_alight: bool = False
+    mode: str = "transit"
+
+
 class JourneyLegOut(BaseModel):
     mode: str
     from_stop_id: str
     to_stop_id: str
     from_stop_name: str
     to_stop_name: str
+    from_stop_lat: Optional[float] = None
+    from_stop_lon: Optional[float] = None
+    to_stop_lat: Optional[float] = None
+    to_stop_lon: Optional[float] = None
     departure_time: str
     arrival_time: str
     duration_minutes: float
@@ -85,6 +99,8 @@ class JourneyLegOut(BaseModel):
     fare_inr: Optional[float] = None
     fare_note: Optional[str] = None
     source_id: str = ""
+    path_coordinates: List[List[float]] = Field(default_factory=list)
+    stops_detail: List[LegStopDetail] = Field(default_factory=list)
 
 
 class JourneyOut(BaseModel):
