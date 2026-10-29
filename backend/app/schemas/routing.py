@@ -55,6 +55,7 @@ class RoutePlanRequest(BaseModel):
     max_transfers: int = Field(3, ge=0, le=10)
     max_walk_meters: float = Field(800, ge=0, le=5000,
                                    description="Max walking distance per connection (metres)")
+    mode_preference: Optional[str] = Field("all", description="'all', 'metro', 'bus', 'multimodal'")
 
     @model_validator(mode="after")
     def parse_departure_time(self) -> "RoutePlanRequest":
@@ -137,6 +138,41 @@ class RouteCompareResponse(BaseModel):
     journeys: List[JourneyOut]
     metrics: List[RouteCompareMetrics]
     note: str = "Comparisons use server-computed journey data only; client-supplied totals are not trusted."
+
+
+# ─── Mode & Combination Explorer schemas ───────────────────────────────────────
+
+class ModeOption(BaseModel):
+    mode_id: str = Field(..., description="'metro', 'bus', 'multimodal', 'auto', 'cab'")
+    title: str
+    icon: str
+    available: bool
+    description: str
+    estimated_duration_minutes: float
+    estimated_distance_km: float
+    fare_inr: float
+    fare_breakdown: str
+    optimization_tags: List[str]
+    recommended_origin_stop: Optional[StopOut] = None
+    recommended_destination_stop: Optional[StopOut] = None
+    candidate_origin_stops: List[StopOut] = Field(default_factory=list)
+    candidate_destination_stops: List[StopOut] = Field(default_factory=list)
+    lines_or_routes: List[str] = Field(default_factory=list)
+
+
+class ModeExploreRequest(BaseModel):
+    destination_stop_id: str
+    origin_stop_id: Optional[str] = None
+    departure_date: Optional[date] = None
+    departure_time: Optional[str] = "09:00:00"
+
+
+class ModeExploreResponse(BaseModel):
+    origin_stop: Optional[StopOut] = None
+    destination_stop: StopOut
+    straight_line_distance_km: float
+    road_distance_km: float
+    modes: List[ModeOption]
 
 
 # ─── Health schema ────────────────────────────────────────────────────────────

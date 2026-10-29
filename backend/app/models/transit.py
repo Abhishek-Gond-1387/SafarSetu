@@ -302,3 +302,123 @@ class GTFSDataset:
 
         return base_active
 
+    def merge(self, other: GTFSDataset, prefix: str = "metro_") -> None:
+        """Merge another GTFSDataset (e.g. DMRC) into this dataset with prefixed IDs to prevent collisions."""
+        self.agencies.update(other.agencies)
+
+        # Merge Stops
+        for sid, s in other.stops.items():
+            new_sid = f"{prefix}{sid}"
+            clean_name = s.stop_name if "metro" in s.stop_name.lower() else f"{s.stop_name} (Metro Station)"
+            self.stops[new_sid] = Stop(
+                stop_id=new_sid,
+                stop_name=clean_name,
+                stop_lat=s.stop_lat,
+                stop_lon=s.stop_lon,
+                stop_code=s.stop_code,
+                stop_desc=s.stop_desc or "Delhi Metro Station (DMRC)",
+                location_type=s.location_type,
+                parent_station=f"{prefix}{s.parent_station}" if s.parent_station else None,
+                source_id=other.source_id or "dmrc",
+            )
+
+        # Helper for friendly Metro Line names
+        def format_metro_route_name(long_name: str, short_name: str) -> tuple[str, str, str]:
+            lname_up = (long_name or "").upper()
+            if "YELLOW" in lname_up:
+                return "Yellow Line", long_name, "#eab308"
+            elif "BLUE" in lname_up:
+                return "Blue Line", long_name, "#2563eb"
+            elif "RED" in lname_up:
+                return "Red Line", long_name, "#dc2626"
+            elif "GREEN" in lname_up:
+                return "Green Line", long_name, "#16a34a"
+            elif "VIOLET" in lname_up:
+                return "Violet Line", long_name, "#7c3aed"
+            elif "PINK" in lname_up:
+                return "Pink Line", long_name, "#ec4899"
+            elif "MAGENTA" in lname_up:
+                return "Magenta Line", long_name, "#d946ef"
+            elif "AIRPORT" in lname_up or "ORANGE" in lname_up:
+                return "Airport Express", long_name, "#ea580c"
+            elif "GRAY" in lname_up or "GREY" in lname_up:
+                return "Grey Line", long_name, "#64748b"
+            elif "RAPID" in lname_up:
+                return "Rapid Metro", long_name, "#06b6d4"
+            elif "AQUA" in lname_up:
+                return "Aqua Line", long_name, "#0284c7"
+            return short_name or "Metro", long_name, "#0f766e"
+
+        # Merge Routes
+        for rid, r in other.routes.items():
+            new_rid = f"{prefix}{rid}"
+            r_short, r_long, r_color = format_metro_route_name(r.route_long_name or "", r.route_short_name or "")
+            self.routes[new_rid] = Route(
+                route_id=new_rid,
+                route_type=RouteType.METRO,
+                agency_id=r.agency_id or "DMRC",
+                route_short_name=r_short,
+                route_long_name=r_long,
+                route_desc=r.route_desc or "Delhi Metro Rail Network",
+                route_color=r_color,
+                route_text_color="#ffffff" if r_color != "#eab308" else "#000000",
+                source_id=other.source_id or "dmrc",
+            )
+
+        # Merge Calendar
+        for cid, c in other.calendar.items():
+            new_cid = f"{prefix}{cid}"
+            self.calendar[new_cid] = CalendarService(
+                service_id=new_cid,
+                monday=c.monday,
+                tuesday=c.tuesday,
+                wednesday=c.wednesday,
+                thursday=c.thursday,
+                friday=c.friday,
+                saturday=c.saturday,
+                sunday=c.sunday,
+                start_date=c.start_date,
+                end_date=c.end_date,
+            )
+
+        # Merge Calendar Dates
+        for cid, cd_list in other.calendar_dates.items():
+            new_cid = f"{prefix}{cid}"
+            self.calendar_dates[new_cid] = [
+                CalendarDate(service_id=new_cid, date=cd.date, exception_type=cd.exception_type)
+                for cd in cd_list
+            ]
+
+        # Merge Trips
+        for tid, t in other.trips.items():
+            new_tid = f"{prefix}{tid}"
+            new_rid = f"{prefix}{t.route_id}"
+            new_cid = f"{prefix}{t.service_id}"
+            self.trips[new_tid] = Trip(
+                trip_id=new_tid,
+                route_id=new_rid,
+                service_id=new_cid,
+                trip_headsign=t.trip_headsign,
+                trip_short_name=t.trip_short_name,
+                direction_id=t.direction_id,
+                shape_id=f"{prefix}{t.shape_id}" if t.shape_id else None,
+                source_id=other.source_id or "dmrc",
+            )
+
+        # Merge StopTimes
+        for tid, st_list in other.stop_times.items():
+            new_tid = f"{prefix}{tid}"
+            self.stop_times[new_tid] = [
+                StopTime(
+                    trip_id=new_tid,
+                    stop_id=f"{prefix}{st.stop_id}",
+                    stop_sequence=st.stop_sequence,
+                    arrival_seconds=st.arrival_seconds,
+                    departure_seconds=st.departure_seconds,
+                    stop_headsign=st.stop_headsign,
+                    pickup_type=st.pickup_type,
+                    drop_off_type=st.drop_off_type,
+                )
+                for st in st_list
+            ]
+

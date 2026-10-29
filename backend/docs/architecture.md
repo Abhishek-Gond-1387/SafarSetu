@@ -134,3 +134,53 @@ The backend exposes clean structured tools for the future AI agent reasoning lay
 
 | `search_stops` | `GET /api/v1/stops` | Searches authentic bus stops by name or terminal code. |
 | `get_nearby_stops` | `GET /api/v1/stops/nearby` | Finds stops near coordinates with explicit straight-line distance notes. |
+
+---
+
+## 7. Stage 4 — Supabase User Database & Authentication Architecture
+
+### 7.1 Architecture & Separation of Concerns
+SafarSetu maintains a clean, strict separation between **public transit data** and **personal user data**:
+- **Transit Data**: Static Delhi GTFS schedules, in-memory timetable graphs, and real-time vehicle positions remain stateless, high-performance in-memory structures.
+- **User Data**: Personal data (profiles, commuter preferences, bookmarked journeys, search history, and feedback) persists securely in **Supabase PostgreSQL** protected by **Row Level Security (RLS)**.
+
+```
+                      ┌───────────────────────────────────────┐
+                      │    Client (Web / Mobile Frontend)     │
+                      │  - Supabase Auth (Sign-in / Sign-up)  │
+                      │  - Holds JWT access_token             │
+                      └──────────────────┬────────────────────┘
+                                         │ Bearer <token>
+                                         ▼
+                      ┌───────────────────────────────────────┐
+                      │    FastAPI Application Layer          │
+                      │  - get_current_user (JWT verification)│
+                      │  - Validates stop IDs against GTFS    │
+                      └──────────┬─────────────────┬──────────┘
+                                 │                 │
+                ┌────────────────▼┐               ┌▼────────────────────────┐
+                │ Transit Engine  │               │ Supabase PostgreSQL DB  │
+                │ (In-memory)     │               │ (Row Level Security)    │
+                │ - Stops, Trips  │               │ - profiles              │
+                │ - Graph Router  │               │ - user_preferences     │
+                │ - Realtime Repo │               │ - saved_journeys        │
+                └─────────────────┘               │ - recent_searches       │
+                                                  │ - user_feedback         │
+                                                  └─────────────────────────┘
+```
+
+### 7.2 Cryptographic Token Verification
+- Handled in [`backend/app/core/auth.py`](file:///d:/SafarSetu/backend/app/core/auth.py).
+- Verifies JWT signatures using the project's `SUPABASE_JWT_SECRET` (`HS256`).
+- Validates expiration (`exp`), audience (`authenticated`), and extracts the verified subject claim (`sub`) as `AuthenticatedUser.id` (UUID).
+- **Security Rule**: The application *never* trusts client-supplied `user_id` parameters. All database queries strictly bind to the verified `auth.uid` extracted from the token.
+
+### 7.3 Row Level Security (RLS) Policies
+- All user tables have RLS enabled.
+- Default policies mandate `auth.uid() = user_id` (or `auth.uid() = id` for `profiles`) across `SELECT`, `INSERT`, `UPDATE`, and `DELETE`.
+- Prevents cross-user data leakage and tampering (verified in automated tests).
+- Automated database triggers handle:
+  - `handle_updated_at`: Automatically sets `updated_at` timestamps on row updates.
+  - `handle_new_user`: Auto-creates default profile and preferences on `auth.users` insert.
+  - `enforce_recent_searches_retention`: Enforces 20-item rolling retention cap on recent searches.
+

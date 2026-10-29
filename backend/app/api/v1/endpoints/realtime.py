@@ -8,8 +8,15 @@ from app.schemas.realtime import (
     VehiclePositionOut,
 )
 from app.services.data_source_service import get_transit_context
+from app.services.metro_realtime_service import DMRCRealtimeService, MetroNetworkStatusResponse
 
 router = APIRouter()
+
+
+@router.get("/metro", response_model=MetroNetworkStatusResponse, summary="Delhi Metro (DMRC) Real-Time Line Operations")
+def get_dmrc_metro_realtime_status():
+    """Retrieve operational telemetry, current headway, frequency, and live line alerts for all Delhi Metro (DMRC) lines."""
+    return DMRCRealtimeService.get_network_status()
 
 
 @router.get("/status", response_model=RealtimeStatusResponse, summary="Real-Time Feed Polling Status")

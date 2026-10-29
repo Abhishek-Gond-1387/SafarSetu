@@ -1,0 +1,870 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Navigation,
+  MapPin,
+  TrainTrack,
+  Bus,
+  Car,
+  Clock,
+  ArrowRight,
+  CheckCircle2,
+  Zap,
+  Coins,
+  Scale,
+  Loader2,
+  ChevronRight,
+  Layers,
+  ArrowUpDown,
+  CircleDollarSign,
+  Compass,
+  Sparkles,
+  LocateFixed,
+  Crosshair,
+  AlertCircle,
+} from 'lucide-react';
+import {
+  SafarSetuAPI,
+  StopItem,
+  ModeOption,
+  ModeExploreResponse,
+  PlanRouteParams,
+} from '../lib/api';
+
+interface ModeExplorerSearchProps {
+  onPlanRoute: (params: PlanRouteParams) => void;
+  isLoading: boolean;
+}
+
+const isMetroStop = (stop: StopItem) => {
+  return stop.stop_id.startsWith('metro_') || stop.stop_name.toLowerCase().includes('metro');
+};
+
+const POPULAR_DESTINATIONS = [
+  { label: '🏛️ Red Fort', query: 'Red Fort' },
+  { label: '🎓 MAIT', query: 'MAIT' },
+  { label: '📚 DU (Delhi Univ)', query: 'DU' },
+  { label: '🛍️ Connaught Place (CP)', query: 'CP' },
+  { label: '🔬 IIT Delhi', query: 'IIT' },
+  { label: '🏥 AIIMS', query: 'AIIMS' },
+  { label: '✈️ IGI Airport', query: 'IGI Airport' },
+];
+
+export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
+  onPlanRoute,
+  isLoading,
+}) => {
+  // Location Permission & Geolocation State
+  const [locationStep, setLocationStep] = useState<'prompt' | 'requesting' | 'detected' | 'manual'>('prompt');
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [detectedCoords, setDetectedCoords] = useState<{ lat: number; lon: number } | null>(null);
+  const [stopDistanceMeters, setStopDistanceMeters] = useState<number | null>(null);
+
+  // Destination state
+  const [destQuery, setDestQuery] = useState('');
+  const [destStop, setDestStop] = useState<StopItem | null>(null);
+  const [destSuggestions, setDestSuggestions] = useState<StopItem[]>([]);
+  const [showDestDropdown, setShowDestDropdown] = useState(false);
+  const [isDestLoading, setIsDestLoading] = useState(false);
+
+  // Origin state
+  const [originQuery, setOriginQuery] = useState('');
+  const [originStop, setOriginStop] = useState<StopItem | null>(null);
+  const [originSuggestions, setOriginSuggestions] = useState<StopItem[]>([]);
+  const [showOriginDropdown, setShowOriginDropdown] = useState(false);
+  const [isOriginLoading, setIsOriginLoading] = useState(false);
+
+  // Mode Exploration state
+  const [modeData, setModeData] = useState<ModeExploreResponse | null>(null);
+  const [isExploring, setIsExploring] = useState(false);
+  const [selectedModeId, setSelectedModeId] = useState<'metro' | 'bus' | 'multimodal' | 'auto' | 'cab'>('metro');
+  const [selectedCriterion, setSelectedCriterion] = useState<'fastest' | 'cheapest' | 'balanced'>('fastest');
+
+  // Custom stop selection for the selected mode
+  const [chosenOriginStopId, setChosenOriginStopId] = useState<string>('');
+  const [chosenDestStopId, setChosenDestStopId] = useState<string>('');
+
+  // Date and Time
+  const todayStr = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const [travelDate, setTravelDate] = useState(todayStr);
+  const [travelTime, setTravelTime] = useState(timeStr);
+
+  // Check if browser already granted location on mount
+  useEffect(() => {
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then((status) => {
+        if (status.state === 'granted') {
+          handleRequestLocation();
+        }
+      }).catch(() => {
+        // Fallback to normal prompt
+      });
+    }
+  }, []);
+
+  // Request browser geolocation
+  const handleRequestLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported by your browser.');
+      setLocationStep('manual');
+      return;
+    }
+
+    setIsLocating(true);
+    setLocationError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+        setDetectedCoords(coords);
+
+        try {
+          const res = await SafarSetuAPI.getNearbyStops(coords.lat, coords.lon, 4500, 10);
+          if (res.results && res.results.length > 0) {
+            const closest = res.results[0];
+            setOriginStop(closest);
+            setOriginQuery(closest.stop_name);
+            setStopDistanceMeters(closest.distance_meters);
+            setLocationStep('detected');
+
+            // If destination already chosen, explore modes from this new location
+            if (destStop) {
+              fetchModes(destStop, closest);
+            }
+          } else {
+            // User coordinates outside Delhi transit dataset coverage
+            setLocationError('Location detected, but no Delhi transit stops within 4km. Defaulting to Central Delhi (Rajiv Chowk).');
+            const defRes = await SafarSetuAPI.searchStops('Rajiv Chowk', 1);
+            if (defRes.results && defRes.results.length > 0) {
+              setOriginStop(defRes.results[0]);
+              setOriginQuery(defRes.results[0].stop_name);
+            }
+            setLocationStep('manual');
+          }
+        } catch (err) {
+          console.error('Failed to resolve nearby stops from GPS:', err);
+          setLocationStep('manual');
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      (err) => {
+        console.warn('Geolocation denied or unavailable:', err.message);
+        setIsLocating(false);
+        setLocationError('Location permission denied or unavailable. Please choose your starting location manually.');
+        setLocationStep('manual');
+      },
+      { enableHighAccuracy: true, timeout: 9000, maximumAge: 60000 }
+    );
+  };
+
+  // Debounced Destination Search
+  useEffect(() => {
+    if (!destQuery.trim() || (destStop && destStop.stop_name === destQuery.trim())) {
+      setDestSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsDestLoading(true);
+      try {
+        const res = await SafarSetuAPI.searchStops(destQuery.trim(), 8);
+        setDestSuggestions(res.results || []);
+        setShowDestDropdown(true);
+      } catch {
+        setDestSuggestions([]);
+      } finally {
+        setIsDestLoading(false);
+      }
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [destQuery, destStop]);
+
+  // Debounced Origin Search
+  useEffect(() => {
+    if (!originQuery.trim() || (originStop && originStop.stop_name === originQuery.trim())) {
+      setOriginSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsOriginLoading(true);
+      try {
+        const res = await SafarSetuAPI.searchStops(originQuery.trim(), 8);
+        setOriginSuggestions(res.results || []);
+        setShowOriginDropdown(true);
+      } catch {
+        setOriginSuggestions([]);
+      } finally {
+        setIsOriginLoading(false);
+      }
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [originQuery, originStop]);
+
+  // Fetch transportation mode combinations and trigger route calculation
+  const fetchModes = async (dest: StopItem, orig?: StopItem | null) => {
+    setIsExploring(true);
+    try {
+      const res = await SafarSetuAPI.exploreModes({
+        destination_stop_id: dest.stop_id,
+        origin_stop_id: orig?.stop_id,
+        departure_date: travelDate,
+        departure_time: `${travelTime}:00`,
+      });
+      setModeData(res);
+
+      const metroMode = res.modes.find((m) => m.mode_id === 'metro') || res.modes[0];
+      const initialOrigId = metroMode?.recommended_origin_stop?.stop_id || orig?.stop_id || res.origin_stop?.stop_id || '';
+      const initialDestId = metroMode?.recommended_destination_stop?.stop_id || dest.stop_id;
+
+      if (metroMode) {
+        setSelectedModeId(metroMode.mode_id);
+        setChosenOriginStopId(initialOrigId);
+        setChosenDestStopId(initialDestId);
+      }
+
+      // Auto-compute routes for the active path so the choosing page displays routes immediately
+      if (initialOrigId && initialDestId) {
+        const pref = metroMode?.mode_id === 'auto' || metroMode?.mode_id === 'cab' ? 'all' : (metroMode?.mode_id || 'all');
+        onPlanRoute({
+          origin_stop_id: initialOrigId,
+          destination_stop_id: initialDestId,
+          departure_date: travelDate,
+          departure_time: `${travelTime}:00`,
+          criterion: selectedCriterion,
+          mode_preference: pref,
+          max_transfers: 3,
+          max_walk_meters: 800,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to explore modes', err);
+    } finally {
+      setIsExploring(false);
+    }
+  };
+
+  const handleSelectDest = (stop: StopItem) => {
+    setDestStop(stop);
+    setDestQuery(stop.stop_name);
+    setShowDestDropdown(false);
+    fetchModes(stop, originStop);
+  };
+
+  const handleSelectOrigin = (stop: StopItem) => {
+    setOriginStop(stop);
+    setOriginQuery(stop.stop_name);
+    setShowOriginDropdown(false);
+    if (destStop) {
+      fetchModes(destStop, stop);
+    }
+  };
+
+  const handleQuickChip = async (query: string) => {
+    setDestQuery(query);
+    setIsDestLoading(true);
+    try {
+      const res = await SafarSetuAPI.searchStops(query, 5);
+      if (res.results && res.results.length > 0) {
+        handleSelectDest(res.results[0]);
+      }
+    } catch (err) {
+      console.error('Quick chip search error:', err);
+    } finally {
+      setIsDestLoading(false);
+    }
+  };
+
+  const handleModeChange = (mode: ModeOption) => {
+    setSelectedModeId(mode.mode_id);
+    let criterion: 'fastest' | 'cheapest' | 'balanced' = selectedCriterion;
+    if (mode.mode_id === 'bus') {
+      criterion = 'cheapest';
+      setSelectedCriterion('cheapest');
+    } else if (mode.mode_id === 'metro') {
+      criterion = 'fastest';
+      setSelectedCriterion('fastest');
+    } else if (mode.mode_id === 'multimodal') {
+      criterion = 'balanced';
+      setSelectedCriterion('balanced');
+    }
+
+    const newOrig = mode.recommended_origin_stop?.stop_id || chosenOriginStopId || originStop?.stop_id || modeData?.origin_stop?.stop_id;
+    const newDest = mode.recommended_destination_stop?.stop_id || chosenDestStopId || destStop?.stop_id || modeData?.destination_stop?.stop_id;
+
+    if (mode.recommended_origin_stop) {
+      setChosenOriginStopId(mode.recommended_origin_stop.stop_id);
+    }
+    if (mode.recommended_destination_stop) {
+      setChosenDestStopId(mode.recommended_destination_stop.stop_id);
+    }
+
+    if (newOrig && newDest) {
+      onPlanRoute({
+        origin_stop_id: newOrig,
+        destination_stop_id: newDest,
+        departure_date: travelDate,
+        departure_time: `${travelTime}:00`,
+        criterion: criterion,
+        mode_preference: mode.mode_id === 'auto' || mode.mode_id === 'cab' ? 'all' : mode.mode_id,
+        max_transfers: 3,
+        max_walk_meters: 800,
+      });
+    }
+  };
+
+  const handleCriterionChange = (criterion: 'fastest' | 'cheapest' | 'balanced') => {
+    setSelectedCriterion(criterion);
+    const finalOrigin = chosenOriginStopId || originStop?.stop_id || modeData?.origin_stop?.stop_id;
+    const finalDest = chosenDestStopId || destStop?.stop_id || modeData?.destination_stop?.stop_id;
+    if (finalOrigin && finalDest) {
+      onPlanRoute({
+        origin_stop_id: finalOrigin,
+        destination_stop_id: finalDest,
+        departure_date: travelDate,
+        departure_time: `${travelTime}:00`,
+        criterion: criterion,
+        mode_preference: selectedModeId === 'auto' || selectedModeId === 'cab' ? 'all' : selectedModeId,
+        max_transfers: 3,
+        max_walk_meters: 800,
+      });
+    }
+  };
+
+  const handlePlanJourney = () => {
+    const finalOrigin = chosenOriginStopId || originStop?.stop_id || modeData?.origin_stop?.stop_id;
+    const finalDest = chosenDestStopId || destStop?.stop_id || modeData?.destination_stop?.stop_id;
+
+    if (!finalOrigin || !finalDest) return;
+
+    onPlanRoute({
+      origin_stop_id: finalOrigin,
+      destination_stop_id: finalDest,
+      departure_date: travelDate,
+      departure_time: `${travelTime}:00`,
+      criterion: selectedCriterion,
+      mode_preference: selectedModeId === 'auto' || selectedModeId === 'cab' ? 'all' : selectedModeId,
+      max_transfers: 3,
+      max_walk_meters: 800,
+    });
+  };
+
+  const currentModeOption = modeData?.modes.find((m) => m.mode_id === selectedModeId);
+
+  return (
+    <div className="search-card mode-explorer-card">
+      {/* ── STEP 0: Location Permission Prompt (Shown first before destination) ── */}
+      {locationStep === 'prompt' && (
+        <div className="location-permission-card">
+          <div className="location-permission-icon-wrap">
+            <LocateFixed size={26} color="#0f766e" />
+          </div>
+          <div className="location-permission-body">
+            <h3 className="location-permission-title">Enable Live Location Access</h3>
+            <p className="location-permission-text">
+              Share your location to find the closest Metro stations &amp; DTC bus stops, and calculate accurate door-to-door distances, walking times, and fares from right where you are.
+            </p>
+
+            <div className="location-permission-buttons">
+              <button
+                type="button"
+                className="btn btn-primary location-allow-btn"
+                onClick={handleRequestLocation}
+                disabled={isLocating}
+              >
+                {isLocating ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Detecting Nearest Stops...</span>
+                  </>
+                ) : (
+                  <>
+                    <Crosshair size={16} />
+                    <span>Share My Current Location</span>
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                className="btn-location-skip"
+                onClick={() => setLocationStep('manual')}
+              >
+                Enter Starting Point Manually
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error notice if location denied */}
+      {locationError && (
+        <div className="alert-box alert-danger" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', fontSize: '0.82rem' }}>
+          <AlertCircle size={15} style={{ flexShrink: 0 }} />
+          <span>{locationError}</span>
+        </div>
+      )}
+
+      {/* ── Active Origin Banner (When Location is Detected) ── */}
+      {locationStep === 'detected' && originStop && (
+        <div className="location-detected-banner">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+            <div className="live-gps-dot" />
+            <span>
+              Starting from: <strong>{originStop.stop_name}</strong>
+              {stopDistanceMeters ? ` (~${Math.round(stopDistanceMeters)}m from your GPS)` : ''}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="btn-change-location"
+            onClick={() => setLocationStep('manual')}
+          >
+            Change Starting Stop
+          </button>
+        </div>
+      )}
+
+      {/* ── Header: Where do you want to go? ── */}
+      <div className="explorer-header">
+        <h2 className="search-title" style={{ marginBottom: '0.25rem' }}>
+          <Compass size={20} color="var(--primary)" />
+          <span>Where do you want to go?</span>
+        </h2>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+          Enter any landmark, monument, or college (e.g. <strong>MAIT</strong>, <strong>DU</strong>, <strong>Red Fort</strong>) to view all transportation modes and route paths.
+        </p>
+      </div>
+
+      {/* Destination First Input */}
+      <div className="form-group" style={{ position: 'relative', marginTop: '1rem' }}>
+        <label className="form-label" htmlFor="destination-main-input">
+          Destination (Where to?)
+        </label>
+        <div className="input-with-icon">
+          <Navigation size={18} className="input-icon" color="var(--primary)" />
+          <input
+            id="destination-main-input"
+            type="text"
+            className="form-input destination-hero-input"
+            placeholder="Search landmark (e.g., MAIT, DU, Red Fort, CP, IIT)"
+            value={destQuery}
+            autoComplete="off"
+            onChange={(e) => {
+              setDestQuery(e.target.value);
+              setDestStop(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                if (destSuggestions.length > 0) {
+                  handleSelectDest(destSuggestions[0]);
+                }
+              }
+            }}
+            onFocus={() => {
+              if (destSuggestions.length > 0) setShowDestDropdown(true);
+            }}
+          />
+          {isDestLoading && (
+            <Loader2
+              size={16}
+              className="animate-spin"
+              style={{ position: 'absolute', right: '0.75rem', color: 'var(--text-muted)' }}
+            />
+          )}
+        </div>
+
+        {/* Quick Landmarks Chips */}
+        <div className="quick-chips-row">
+          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>Quick Landmarks:</span>
+          {POPULAR_DESTINATIONS.map((chip, idx) => (
+            <button
+              key={idx}
+              type="button"
+              className="quick-chip-btn"
+              onClick={() => handleQuickChip(chip.query)}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+
+        {showDestDropdown && destSuggestions.length > 0 && (
+          <ul className="suggestions-dropdown" role="listbox">
+            {destSuggestions.map((stop) => {
+              const isMetro = isMetroStop(stop);
+              return (
+                <li
+                  key={stop.stop_id}
+                  className="suggestion-item"
+                  role="option"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSelectDest(stop);
+                  }}
+                  onClick={() => handleSelectDest(stop)}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 0.85rem' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
+                    {isMetro ? (
+                      <TrainTrack size={16} color="#7c3aed" style={{ flexShrink: 0 }} />
+                    ) : (
+                      <Bus size={16} color="#0f766e" style={{ flexShrink: 0 }} />
+                    )}
+                    <span className="suggestion-name" style={{ fontWeight: 600 }}>
+                      {stop.stop_name}
+                    </span>
+                  </div>
+                  <span className={`suggestion-type-badge ${isMetro ? 'metro' : 'bus'}`}>
+                    {isMetro ? '🚇 Metro Station' : '🚌 Bus Stop'}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      {/* Origin (Starting Point) Input — Shown in manual mode or for customizing */}
+      {(locationStep === 'manual' || !originStop) && (
+        <div className="form-group" style={{ position: 'relative' }}>
+          <label className="form-label" htmlFor="origin-main-input">
+            From (Starting Location / Current Stop)
+          </label>
+          <div className="input-with-icon">
+            <MapPin size={18} className="input-icon" />
+            <input
+              id="origin-main-input"
+              type="text"
+              className="form-input"
+              placeholder="Starting stop (e.g., Kashmere Gate, Hauz Khas, Dwarka)"
+              value={originQuery}
+              autoComplete="off"
+              onChange={(e) => {
+                setOriginQuery(e.target.value);
+                setOriginStop(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (originSuggestions.length > 0) {
+                    handleSelectOrigin(originSuggestions[0]);
+                  }
+                }
+              }}
+              onFocus={() => {
+                if (originSuggestions.length > 0) setShowOriginDropdown(true);
+              }}
+            />
+            {isOriginLoading ? (
+              <Loader2
+                size={16}
+                className="animate-spin"
+                style={{ position: 'absolute', right: '0.75rem', color: 'var(--text-muted)' }}
+              />
+            ) : (
+              <button
+                type="button"
+                className="btn-gps-inline"
+                onClick={handleRequestLocation}
+                title="Use current GPS location"
+              >
+                <Crosshair size={12} />
+                <span>GPS</span>
+              </button>
+            )}
+          </div>
+
+          {showOriginDropdown && originSuggestions.length > 0 && (
+            <ul className="suggestions-dropdown" role="listbox">
+              {originSuggestions.map((stop) => {
+                const isMetro = isMetroStop(stop);
+                return (
+                  <li
+                    key={stop.stop_id}
+                    className="suggestion-item"
+                    role="option"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectOrigin(stop);
+                    }}
+                    onClick={() => handleSelectOrigin(stop)}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 0.85rem' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
+                      {isMetro ? (
+                        <TrainTrack size={16} color="#7c3aed" style={{ flexShrink: 0 }} />
+                      ) : (
+                        <Bus size={16} color="#0f766e" style={{ flexShrink: 0 }} />
+                      )}
+                      <span className="suggestion-name" style={{ fontWeight: 600 }}>
+                        {stop.stop_name}
+                      </span>
+                    </div>
+                    <span className={`suggestion-type-badge ${isMetro ? 'metro' : 'bus'}`}>
+                      {isMetro ? '🚇 Metro Station' : '🚌 Bus Stop'}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* Date & Time Row */}
+      <div className="date-time-row" style={{ marginBottom: '1.25rem' }}>
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label className="form-label">Departure Date</label>
+          <input
+            type="date"
+            className="form-input"
+            value={travelDate}
+            onChange={(e) => setTravelDate(e.target.value)}
+          />
+        </div>
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label className="form-label">Departure Time</label>
+          <input
+            type="time"
+            className="form-input"
+            value={travelTime}
+            onChange={(e) => setTravelTime(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {isExploring && (
+        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+          <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 0.5rem auto' }} />
+          <div>Comparing transportation modes, distance & official fares from your location...</div>
+        </div>
+      )}
+
+      {/* ── Mode Combinations & Fare Comparison Matrix ────────────────────────── */}
+      {modeData && !isExploring && (
+        <div className="modes-comparison-section">
+          <div className="modes-section-headline">
+            <div>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                Available Transportation Combinations & Routes
+              </h3>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                Door-to-Door Distance: {modeData.straight_line_distance_km} km (Road: ~{modeData.road_distance_km} km) • Select your preferred path below:
+              </p>
+            </div>
+          </div>
+
+          <div className="mode-cards-grid">
+            {modeData.modes.map((mode) => {
+              const isSelected = selectedModeId === mode.mode_id;
+              const isMetro = mode.mode_id === 'metro';
+              const isBus = mode.mode_id === 'bus';
+              const isMultimodal = mode.mode_id === 'multimodal';
+              const isAuto = mode.mode_id === 'auto';
+              const isCab = mode.mode_id === 'cab';
+
+              return (
+                <div
+                  key={mode.mode_id}
+                  className={`mode-card ${isSelected ? 'selected' : ''}`}
+                  onClick={() => handleModeChange(mode)}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="mode-card-top">
+                    <div className="mode-card-icon-title">
+                      <div className={`mode-icon-circle ${mode.mode_id}`}>
+                        {isMetro && <TrainTrack size={20} />}
+                        {isBus && <Bus size={20} />}
+                        {isMultimodal && <Layers size={20} />}
+                        {isAuto && <span style={{ fontSize: '1.1rem' }}>🛺</span>}
+                        {isCab && <Car size={20} />}
+                      </div>
+                      <div>
+                        <div className="mode-card-title">{mode.title}</div>
+                        <div className="mode-card-metrics">
+                          <span>~{Math.round(mode.estimated_duration_minutes)} mins</span>
+                          <span>•</span>
+                          <span>{mode.estimated_distance_km} km</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mode-card-fare">
+                      <span className="fare-amount">₹{Math.round(mode.fare_inr)}</span>
+                      <span className="fare-label">Fare</span>
+                    </div>
+                  </div>
+
+                  <div className="mode-card-breakdown">
+                    {mode.fare_breakdown}
+                  </div>
+
+                  <div className="mode-card-tags">
+                    {mode.optimization_tags.map((tag, tIdx) => (
+                      <span key={tIdx} className={`mode-tag ${tIdx === 0 ? 'primary-tag' : ''}`}>
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+
+                  {isSelected && (
+                    <div className="selected-indicator">
+                      <CheckCircle2 size={15} color="#0f766e" /> Selected Path (Viewing Routes Below)
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── Stop Selection According to Chosen Mode ───────────────────────── */}
+          {currentModeOption && (
+            <div className="mode-customization-panel">
+              <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Layers size={16} color="var(--primary)" />
+                Choose Stops for {currentModeOption.title}
+              </h4>
+
+              <div className="custom-stops-grid">
+                {/* Boarding Stop Choice */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem' }}>
+                    Boarding Stop / Station
+                  </label>
+                  <select
+                    className="form-input"
+                    value={chosenOriginStopId}
+                    onChange={(e) => {
+                      setChosenOriginStopId(e.target.value);
+                      const finalDest = chosenDestStopId || destStop?.stop_id || modeData?.destination_stop?.stop_id;
+                      if (e.target.value && finalDest) {
+                        onPlanRoute({
+                          origin_stop_id: e.target.value,
+                          destination_stop_id: finalDest,
+                          departure_date: travelDate,
+                          departure_time: `${travelTime}:00`,
+                          criterion: selectedCriterion,
+                          mode_preference: selectedModeId === 'auto' || selectedModeId === 'cab' ? 'all' : selectedModeId,
+                          max_transfers: 3,
+                          max_walk_meters: 800,
+                        });
+                      }
+                    }}
+                    style={{ fontSize: '0.85rem' }}
+                  >
+                    {currentModeOption.candidate_origin_stops.map((stop) => (
+                      <option key={stop.stop_id} value={stop.stop_id}>
+                        {stop.stop_name} ({stop.stop_id.startsWith('metro_') ? 'Metro' : 'Bus'})
+                      </option>
+                    ))}
+                    {originStop && !currentModeOption.candidate_origin_stops.some((s) => s.stop_id === originStop.stop_id) && (
+                      <option value={originStop.stop_id}>
+                        {originStop.stop_name} ({originStop.stop_id.startsWith('metro_') ? 'Metro' : 'Bus'})
+                      </option>
+                    )}
+                  </select>
+                </div>
+
+                {/* Destination Stop Choice */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem' }}>
+                    Alighting Stop / Station
+                  </label>
+                  <select
+                    className="form-input"
+                    value={chosenDestStopId}
+                    onChange={(e) => {
+                      setChosenDestStopId(e.target.value);
+                      const finalOrigin = chosenOriginStopId || originStop?.stop_id || modeData?.origin_stop?.stop_id;
+                      if (finalOrigin && e.target.value) {
+                        onPlanRoute({
+                          origin_stop_id: finalOrigin,
+                          destination_stop_id: e.target.value,
+                          departure_date: travelDate,
+                          departure_time: `${travelTime}:00`,
+                          criterion: selectedCriterion,
+                          mode_preference: selectedModeId === 'auto' || selectedModeId === 'cab' ? 'all' : selectedModeId,
+                          max_transfers: 3,
+                          max_walk_meters: 800,
+                        });
+                      }
+                    }}
+                    style={{ fontSize: '0.85rem' }}
+                  >
+                    {currentModeOption.candidate_destination_stops.map((stop) => (
+                      <option key={stop.stop_id} value={stop.stop_id}>
+                        {stop.stop_name} ({stop.stop_id.startsWith('metro_') ? 'Metro' : 'Bus'})
+                      </option>
+                    ))}
+                    {destStop && !currentModeOption.candidate_destination_stops.some((s) => s.stop_id === destStop.stop_id) && (
+                      <option value={destStop.stop_id}>
+                        {destStop.stop_name} ({destStop.stop_id.startsWith('metro_') ? 'Metro' : 'Bus'})
+                      </option>
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              {/* Optimization Parameters (Distance vs Fare vs Balanced) */}
+              <div style={{ marginTop: '0.9rem' }}>
+                <span className="form-label" style={{ fontSize: '0.8rem', display: 'block', marginBottom: '0.35rem' }}>
+                  Optimization Parameter
+                </span>
+                <div className="optimization-btn-group">
+                  <button
+                    type="button"
+                    className={`opt-btn ${selectedCriterion === 'fastest' ? 'active' : ''}`}
+                    onClick={() => handleCriterionChange('fastest')}
+                  >
+                    <Zap size={14} />
+                    <span>Distance & Speed (Fastest)</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`opt-btn ${selectedCriterion === 'cheapest' ? 'active' : ''}`}
+                    onClick={() => handleCriterionChange('cheapest')}
+                  >
+                    <Coins size={14} />
+                    <span>Fare Optimization (Cheapest)</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`opt-btn ${selectedCriterion === 'balanced' ? 'active' : ''}`}
+                    onClick={() => handleCriterionChange('balanced')}
+                  >
+                    <Scale size={14} />
+                    <span>Balanced (Least Walking)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Plan / Refresh Journey Button */}
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handlePlanJourney}
+                disabled={isLoading}
+                style={{ width: '100%', marginTop: '1.1rem', padding: '0.75rem', fontSize: '0.95rem', fontWeight: 700 }}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Finding Optimal Timetable & Routes...
+                  </>
+                ) : (
+                  <>
+                    <span>Update Route for {currentModeOption.title}</span>
+                    <ArrowRight size={16} />
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};

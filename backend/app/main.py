@@ -1,7 +1,10 @@
+import os
+from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.api import api_router
 from app.api.v1.endpoints.health import get_health
@@ -12,14 +15,14 @@ from app.services.data_source_service import TransitContext
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print(f"🚀 Starting up {settings.PROJECT_NAME} (v{settings.VERSION})...")
+    print(f"[*] Starting up {settings.PROJECT_NAME} (v{settings.VERSION})...")
     # Initialize transit data into repository and graph engine
     TransitContext.initialize()
     # Start live background poller if enabled and configured
     if TransitContext.realtime_poller:
         await TransitContext.realtime_poller.start()
     yield
-    print(f"🛑 Shutting down {settings.PROJECT_NAME}...")
+    print(f"[*] Shutting down {settings.PROJECT_NAME}...")
     if TransitContext.realtime_poller:
         await TransitContext.realtime_poller.stop()
 
@@ -50,6 +53,11 @@ app.add_middleware(
 # Include API v1 router
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
+# Mount frontend dist if compiled
+_frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+if _frontend_dist.exists() and (_frontend_dist / "index.html").exists():
+    app.mount("/app", StaticFiles(directory=str(_frontend_dist), html=True), name="frontend")
+
 
 @app.get("/", summary="Root Endpoint", tags=["Root"])
 def root():
@@ -57,6 +65,7 @@ def root():
         content={
             "message": f"Welcome to {settings.PROJECT_NAME}",
             "version": settings.VERSION,
+            "frontend": "/app" if _frontend_dist.exists() else "unbuilt",
             "docs": "/docs",
             "redoc": "/redoc",
             "health": "/health",

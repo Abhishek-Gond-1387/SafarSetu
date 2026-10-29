@@ -44,9 +44,24 @@ class TransitContext:
         target_source = source_id or settings.DEFAULT_SOURCE_ID
         trips_limit = max_trips if max_trips is not None else settings.MAX_LOADED_TRIPS
 
-        print(f"📦 Loading GTFS dataset from: {target_dir} (source: {target_source})...")
+        print(f"[*] Loading GTFS dataset from: {target_dir} (source: {target_source})...")
         if os.path.isdir(target_dir):
             cls.dataset = GTFSLoader.load(target_dir, source_id=target_source, max_trips=trips_limit)
+
+            # Ingest DMRC (Delhi Metro) static dataset if present
+            dmrc_dir = os.path.join(os.path.dirname(target_dir), "dmrc")
+            if not os.path.isdir(dmrc_dir):
+                backend_dmrc = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "raw", "dmrc")
+                if os.path.isdir(backend_dmrc):
+                    dmrc_dir = backend_dmrc
+
+            if os.path.isdir(dmrc_dir):
+                print(f"[*] Ingesting DMRC Delhi Metro network from: {dmrc_dir}...")
+                dmrc_data = GTFSLoader.load(dmrc_dir, source_id="dmrc")
+                if dmrc_data and not dmrc_data.is_empty:
+                    cls.dataset.merge(dmrc_data, prefix="metro_")
+                    print(f"[OK] Ingested DMRC Metro: +{len(dmrc_data.stops)} stations, +{len(dmrc_data.routes)} lines, +{len(dmrc_data.trips)} trips.")
+
             cls.repository = TransitRepository(cls.dataset)
             cls.graph = GraphBuilder.build_graph(
                 cls.dataset,
@@ -55,10 +70,10 @@ class TransitContext:
             )
             cls.router = RoutingEngine(cls.dataset, cls.graph)
             cls.is_initialized = True
-            print(f"✅ Ingestion complete: {len(cls.dataset.stops)} stops, {len(cls.dataset.routes)} routes, "
+            print(f"[OK] Ingestion complete: {len(cls.dataset.stops)} stops, {len(cls.dataset.routes)} routes, "
                   f"{len(cls.dataset.trips)} trips, {cls.graph.total_transit_edges} transit edges.")
         else:
-            print(f"⚠️ GTFS directory not found: {target_dir}. Context initialized empty.")
+            print(f"[WARN] GTFS directory not found: {target_dir}. Context initialized empty.")
             cls.dataset = None
             cls.repository = TransitRepository()
             cls.graph = TransitGraph()

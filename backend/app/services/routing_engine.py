@@ -8,8 +8,9 @@ from itertools import count
 from typing import Dict, List, Optional, Set, Tuple
 
 from app.models.journey import Journey, JourneyLeg, LegMode, RouteRankCriterion
-from app.models.transit import GTFSDataset, StopTime
+from app.models.transit import GTFSDataset, StopTime, RouteType
 from app.services.graph_builder import ScheduledTransitEdge, TransitGraph
+from app.utils.geo import haversine_meters
 
 
 class RoutingEngine:
@@ -18,6 +19,51 @@ class RoutingEngine:
     def __init__(self, dataset: GTFSDataset, graph: TransitGraph):
         self.dataset = dataset
         self.graph = graph
+
+    @staticmethod
+    def calculate_transit_fare(
+        mode: LegMode,
+        from_lat: float,
+        from_lon: float,
+        to_lat: float,
+        to_lon: float,
+        route_name: Optional[str] = None,
+    ) -> float:
+        """Calculate official Delhi transit fares (DMRC distance slabs or DTC bus slabs)."""
+        d_km = haversine_meters(from_lat, from_lon, to_lat, to_lon) / 1000.0
+        if mode == LegMode.METRO:
+            if d_km <= 2.0:
+                return 10.0
+            elif d_km <= 5.0:
+                return 20.0
+            elif d_km <= 12.0:
+                return 30.0
+            elif d_km <= 21.0:
+                return 40.0
+            elif d_km <= 32.0:
+                return 50.0
+            else:
+                return 60.0
+        else:
+            # DTC Bus Fare (Delhi Government official distance slabs)
+            r_str = (route_name or "").upper()
+            is_ac = "AC" in r_str or "EXP" in r_str or "ELECTRIC" in r_str
+            if is_ac:
+                if d_km <= 4.0:
+                    return 10.0
+                elif d_km <= 8.0:
+                    return 15.0
+                elif d_km <= 12.0:
+                    return 20.0
+                else:
+                    return 25.0
+            else:
+                if d_km <= 4.0:
+                    return 5.0
+                elif d_km <= 10.0:
+                    return 10.0
+                else:
+                    return 15.0
 
     def plan_journey(
         self,
@@ -28,6 +74,7 @@ class RoutingEngine:
         max_transfers: int = 3,
         criterion: RouteRankCriterion = RouteRankCriterion.FASTEST,
         max_candidates: int = 3,
+        mode_filter: str = "all",
     ) -> Tuple[List[Journey], Optional[str]]:
         """Compute candidate journeys from origin to destination.
 
@@ -110,13 +157,27 @@ class RoutingEngine:
 
             # 1. Scheduled Transit Outgoing Edges
             transit_edges = self.graph.get_transit_departures(curr_stop, after_seconds=curr_time)
+            seen_route_dest: Dict[Tuple[str, str], int] = {}
             for edge in transit_edges:
+                is_same_trip = (curr_trip_id == edge.trip_id)
+
+                # Prune departures beyond reasonable waiting window (90 mins) when transferring
+                if not is_same_trip and edge.departure_seconds > curr_time + 5400:
+                    break  # edges are sorted by departure_seconds, so subsequent edges are strictly later
+
                 trip = self.dataset.trips.get(edge.trip_id)
                 # Check calendar service filter
                 if active_services and trip and trip.service_id not in active_services:
                     continue
 
-                is_same_trip = (curr_trip_id == edge.trip_id)
+                # Frequency pruning: only consider earliest departure per (route_id, to_stop_id) when transferring at intermediate stops
+                if not is_same_trip and curr_trip_id is not None:
+                    rd_key = (edge.route_id, edge.to_stop_id)
+                    seen_count = seen_route_dest.get(rd_key, 0)
+                    if seen_count >= 1:
+                        continue
+                    seen_route_dest[rd_key] = seen_count + 1
+
                 next_transfers = num_transfers if is_same_trip else (num_transfers + 1 if curr_trip_id is not None else num_transfers)
                 if next_transfers > max_transfers:
                     continue
@@ -126,8 +187,39 @@ class RoutingEngine:
                 if edge.departure_seconds < min_dep:
                     continue
 
+                route = self.dataset.routes.get(edge.route_id)
+                is_metro = (
+                    (route and (route.route_type == RouteType.METRO or route.route_type == 1)) or
+                    edge.route_id.startswith("metro_") or
+                    (route and "dmrc" in (route.agency_id or "").lower())
+                )
+
+                # Filter by mode preference if specified
+                if mode_filter == "metro" and not is_metro:
+                    continue
+                if mode_filter == "bus" and is_metro:
+                    continue
+
+                leg_mode = LegMode.METRO if is_metro else LegMode.BUS
+                r_short = route.route_short_name if route else None
+                r_long = route.route_long_name if route else None
+
+                # Compute distance-based fare for Metro and DTC Bus legs
+                from_s = self.dataset.stops.get(edge.from_stop_id)
+                to_s = self.dataset.stops.get(edge.to_stop_id)
+                leg_fare = None
+                if from_s and to_s:
+                    leg_fare = self.calculate_transit_fare(
+                        leg_mode,
+                        from_s.stop_lat,
+                        from_s.stop_lon,
+                        to_s.stop_lat,
+                        to_s.stop_lon,
+                        r_short or r_long,
+                    )
+
                 new_leg = JourneyLeg(
-                    mode=LegMode.BUS,
+                    mode=leg_mode,
                     from_stop_id=edge.from_stop_id,
                     to_stop_id=edge.to_stop_id,
                     from_stop_name=self.dataset.stops[edge.from_stop_id].stop_name,
@@ -136,14 +228,32 @@ class RoutingEngine:
                     arrival_seconds=edge.arrival_seconds,
                     duration_seconds=edge.duration_seconds,
                     route_id=edge.route_id,
+                    route_short_name=r_short,
+                    route_long_name=r_long,
                     trip_id=edge.trip_id,
-                    source_id=self.dataset.source_id,
+                    headsign=trip.trip_headsign if trip else None,
+                    fare_inr=leg_fare,
+                    fare_currency="INR" if leg_fare is not None else None,
+                    source_id=route.source_id if route else self.dataset.source_id,
                 )
 
                 new_legs = list(legs)
                 # Collapse consecutive legs on the same trip cleanly without mutating shared parent objects
                 if new_legs and new_legs[-1].trip_id == edge.trip_id and new_legs[-1].to_stop_id == edge.from_stop_id:
                     prev = new_legs[-1]
+                    from_s = self.dataset.stops.get(prev.from_stop_id)
+                    to_s = self.dataset.stops.get(edge.to_stop_id)
+                    c_fare = prev.fare_inr
+                    if from_s and to_s:
+                        c_fare = self.calculate_transit_fare(
+                            prev.mode,
+                            from_s.stop_lat,
+                            from_s.stop_lon,
+                            to_s.stop_lat,
+                            to_s.stop_lon,
+                            prev.route_short_name or prev.route_long_name,
+                        )
+
                     collapsed_leg = JourneyLeg(
                         mode=prev.mode,
                         from_stop_id=prev.from_stop_id,
@@ -154,8 +264,13 @@ class RoutingEngine:
                         arrival_seconds=edge.arrival_seconds,
                         duration_seconds=edge.arrival_seconds - prev.departure_seconds,
                         route_id=prev.route_id,
+                        route_short_name=prev.route_short_name,
+                        route_long_name=prev.route_long_name,
                         trip_id=prev.trip_id,
+                        headsign=prev.headsign,
                         intermediate_stops=prev.intermediate_stops + [edge.from_stop_id],
+                        fare_inr=c_fare,
+                        fare_currency="INR" if c_fare is not None else None,
                         source_id=prev.source_id,
                     )
                     new_legs[-1] = collapsed_leg
@@ -231,14 +346,12 @@ class RoutingEngine:
         num_transfers = max(0, len(transit_legs) - 1)
 
         # Fare computation
-        has_fares = self.dataset.has_fare_data
         total_fare = None
         fare_complete = False
-        if has_fares:
-            leg_fares = [l.fare_inr for l in transit_legs if l.fare_inr is not None]
-            if len(leg_fares) == len(transit_legs):
-                total_fare = sum(leg_fares)
-                fare_complete = True
+        leg_fares = [l.fare_inr for l in transit_legs if l.fare_inr is not None]
+        if len(leg_fares) == len(transit_legs) and transit_legs:
+            total_fare = sum(leg_fares)
+            fare_complete = True
 
         warnings = []
         is_expired = False

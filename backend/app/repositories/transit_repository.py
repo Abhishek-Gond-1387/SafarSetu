@@ -8,6 +8,63 @@ from app.models.transit import GTFSDataset, Route, Stop, StopTime, Trip
 from app.utils.geo import bbox_for_radius, haversine_meters
 
 
+DELHI_LANDMARK_ALIASES: Dict[str, List[str]] = {
+    "mait": ["rohini sec 22", "aggarsain", "rohini sec 22 terminal", "begum pur", "rithala"],
+    "maharaja agrasen": ["rohini sec 22", "aggarsain", "rohini sec 22 terminal"],
+    "du": ["vishwavidyalaya", "delhi university", "patel chest", "chhatra marg", "gtb nagar", "south campus"],
+    "delhi university": ["vishwavidyalaya", "delhi university", "patel chest", "chhatra marg", "south campus"],
+    "north campus": ["vishwavidyalaya", "gtb nagar", "delhi university"],
+    "south campus": ["durgabai deshmukh", "south campus", "moti bagh", "benito juarez"],
+    "red fort": ["red fort", "lal quila", "lal qila", "jama masjid", "chandni chowk"],
+    "redfort": ["red fort", "lal quila", "lal qila", "jama masjid"],
+    "lal quila": ["lal quila", "red fort"],
+    "lal qila": ["lal quila", "red fort"],
+    "india gate": ["central secretariat", "national stadium", "khan market", "baroda house", "pragati maidan"],
+    "cp": ["rajiv chowk", "connaught place", "barakhamba", "shivaji stadium", "janpath"],
+    "connaught place": ["rajiv chowk", "connaught place", "barakhamba", "shivaji stadium", "janpath"],
+    "iit": ["iit", "hauz khas", "panchsheel"],
+    "iit delhi": ["iit", "hauz khas"],
+    "dtu": ["shahbad daulatpur", "samaypur badli", "rohini sector 18", "delhi technological"],
+    "dce": ["shahbad daulatpur", "samaypur badli", "delhi technological"],
+    "nsut": ["dwarka mor", "dwarka sector 3", "netaji subhash"],
+    "nsit": ["dwarka mor", "dwarka sector 3", "netaji subhash"],
+    "jnu": ["munirka", "ber sarai", "vasant kunj"],
+    "aiims": ["aiims", "safdarjung hospital", "dilli haat inat"],
+    "safdarjung": ["safdarjung", "aiims"],
+    "lotus temple": ["kalkaji mandir", "nehru place"],
+    "akshardham": ["akshardham", "mayur vihar"],
+    "qutub minar": ["qutab minar", "saket"],
+    "qutab minar": ["qutab minar", "saket"],
+    "bangla sahib": ["shivaji stadium", "patel chowk", "gurudwara bangla sahib"],
+    "cyber city": ["cyber city", "sikanderpur", "indusind bank cyber city"],
+    "igi airport": ["igi airport", "t3", "delhi aerocity"],
+    "airport": ["igi airport", "t3", "delhi aerocity"],
+    "t3": ["igi airport", "t3"],
+    "terminal 3": ["igi airport", "t3"],
+    "isbt kashmere gate": ["kashmere gate", "isbt kashmere gate"],
+    "kashmere gate": ["kashmere gate", "isbt kashmere gate"],
+    "anand vihar": ["anand vihar", "anand vihar isbt"],
+    "ndls": ["new delhi", "new delhi railway station"],
+    "new delhi railway": ["new delhi", "new delhi railway station"],
+    "old delhi railway": ["chandni chowk", "old delhi railway station"],
+    "dli": ["chandni chowk", "old delhi railway station"],
+    "nizamuddin": ["sarai kale khan", "nizamuddin railway station"],
+    "nzm": ["sarai kale khan", "nizamuddin railway station"],
+    "sarojini nagar": ["sarojini nagar"],
+    "lajpat nagar": ["lajpat nagar"],
+    "hauz khas": ["hauz khas"],
+    "saket": ["saket", "malviya nagar"],
+    "nehru place": ["nehru place", "kalkaji"],
+    "chandni chowk": ["chandni chowk", "lal quila"],
+    "karol bagh": ["karol bagh", "jhandewalan"],
+    "dwarka": ["dwarka sector", "dwarka mor"],
+    "rohini": ["rohini", "rithala"],
+    "noida": ["noida sector", "botanical garden"],
+    "gurgaon": ["millennium city", "huda city", "iffco chowk", "cyber city", "sikanderpur"],
+    "gurugram": ["millennium city", "huda city", "iffco chowk", "cyber city", "sikanderpur"],
+}
+
+
 class TransitRepository:
     """Manages queries across loaded GTFS datasets."""
 
@@ -50,14 +107,66 @@ class TransitRepository:
         page_size: int = 20,
     ) -> Tuple[List[Stop], int]:
         all_stops = list(self._stops_by_id.values())
-        if query:
-            q = query.strip().lower()
-            filtered = [
-                s for s in all_stops
-                if q in s.stop_name.lower() or (s.stop_code and q in s.stop_code.lower()) or q in s.stop_id.lower()
-            ]
-        else:
-            filtered = all_stops
+        if not query or not query.strip():
+            total = len(all_stops)
+            start = (page - 1) * page_size
+            return all_stops[start:start + page_size], total
+
+        q = query.strip().lower()
+
+        # Gather alias expansions for landmarks, colleges, and popular acronyms
+        alias_terms: List[str] = []
+        for alias_key, expansions in DELHI_LANDMARK_ALIASES.items():
+            if q == alias_key or q in alias_key or alias_key in q:
+                alias_terms.extend(expansions)
+
+        alias_terms = list(dict.fromkeys(alias_terms))
+
+        is_short = len(q) <= 3
+
+        scored: List[Tuple[int, Stop]] = []
+        for s in all_stops:
+            name_lower = s.stop_name.lower()
+            code_lower = (s.stop_code or "").lower()
+            id_lower = s.stop_id.lower()
+
+            score = 0
+            words = name_lower.replace("(", " ").replace(")", " ").replace("/", " ").replace("-", " ").split()
+            
+            # 1. Exact or word-boundary match with query
+            if q == name_lower:
+                score = 100
+            elif q in words:
+                score = 98
+            elif name_lower.startswith(q):
+                score = 92
+
+            # 2. Check landmark alias terms (explicit landmark intent like MAIT, DU, Red Fort, CP)
+            for term in alias_terms:
+                if term == name_lower:
+                    score = max(score, 95)
+                elif name_lower.startswith(term):
+                    score = max(score, 91)
+                elif term in words:
+                    score = max(score, 89)
+                elif term in name_lower:
+                    score = max(score, 86)
+
+            # 3. Substring match fallback
+            if score == 0:
+                if not is_short and (q in name_lower or (code_lower and q in code_lower) or q in id_lower):
+                    score = 70
+                elif is_short and (code_lower and q == code_lower):
+                    score = 85
+                elif is_short and (any(w.startswith(q) for w in words)):
+                    score = 65
+
+            if score > 0:
+                scored.append((score, s))
+
+        # Sort by relevance score descending, then prioritize metro stations for rail queries
+        scored.sort(key=lambda x: (x[0], x[1].stop_id.startswith("metro_")), reverse=True)
+        filtered = [s for _, s in scored]
 
         total = len(filtered)
         start = (page - 1) * page_size
