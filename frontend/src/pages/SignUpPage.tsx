@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Bus, Eye, EyeOff, AlertCircle, CheckCircle, UserPlus, Zap } from 'lucide-react';
 import { supabaseAuth } from '../lib/supabase';
+import heroBgImage from '../assets/hero-delhi-transit.jpg';
 import '../styles/auth.css';
 
 function getPasswordStrength(pw: string): { score: number; label: string } {
@@ -66,7 +67,7 @@ export const SignUpPage: React.FC = () => {
         // If Supabase returned a session directly (email confirmations off), redirect
         const sess = supabaseAuth.getSession();
         if (sess) {
-          navigate('/');
+          navigate('/planner');
         } else {
           setSuccess(
             'Account created! Check your inbox for a confirmation email, then sign in.'
@@ -82,11 +83,24 @@ export const SignUpPage: React.FC = () => {
 
   const handleDemo = () => {
     supabaseAuth.signInDemo();
-    navigate('/');
+    navigate('/planner');
   };
 
   return (
     <div className="auth-page">
+      {/* Background Illustration Canvas with Delhi Transit Artwork */}
+      <div
+        className="auth-bg-media"
+        style={{ backgroundImage: `url(${heroBgImage})` }}
+        role="img"
+        aria-label="Delhi Transit Network illustration with Metro, DTC electric bus and India Gate at sunrise"
+      />
+
+      {/* 3-Layer Atmospheric Color Grading Scrims */}
+      <div className="auth-scrim-primary" />
+      <div className="auth-scrim-vertical" />
+      <div className="auth-scrim-warmth" />
+
       {/* ── Left: branding panel ── */}
       <div className="auth-brand">
         <div className="auth-brand-top">

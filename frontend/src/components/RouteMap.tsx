@@ -292,37 +292,37 @@ export const RouteMap: React.FC<RouteMapProps> = ({
         if (isJourneyStart) {
           // Green Boarding Pin
           iconHtml = `
-            <div style="background: #16a34a; border: 2.5px solid #ffffff; width: 26px; height: 26px; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; font-weight: bold;">
+            <div style="background: linear-gradient(135deg, #10b981 0%, #047857 100%); border: 2.5px solid #ffffff; width: 28px; height: 28px; border-radius: 50%; box-shadow: 0 4px 12px rgba(4, 120, 87, 0.45); display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; font-weight: 800;">
               A
             </div>
           `;
-          iconSize = [26, 26];
-          iconAnchor = [13, 13];
+          iconSize = [28, 28];
+          iconAnchor = [14, 14];
         } else if (isJourneyEnd) {
           // Red Alighting Pin
           iconHtml = `
-            <div style="background: #dc2626; border: 2.5px solid #ffffff; width: 26px; height: 26px; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; font-weight: bold;">
+            <div style="background: linear-gradient(135deg, #f43f5e 0%, #be123c 100%); border: 2.5px solid #ffffff; width: 28px; height: 28px; border-radius: 50%; box-shadow: 0 4px 12px rgba(190, 18, 60, 0.45); display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; font-weight: 800;">
               B
             </div>
           `;
-          iconSize = [26, 26];
-          iconAnchor = [13, 13];
+          iconSize = [28, 28];
+          iconAnchor = [14, 14];
         } else if (isInterchange) {
           // Blue Transfer Pin
           iconHtml = `
-            <div style="background: #2563eb; border: 2px solid #ffffff; width: 18px; height: 18px; border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center; color: white; font-size: 10px;">
+            <div style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border: 2px solid #ffffff; width: 20px; height: 20px; border-radius: 50%; box-shadow: 0 2px 8px rgba(29, 78, 216, 0.35); display: flex; align-items: center; justify-content: center; color: white; font-size: 11px;">
               🔄
             </div>
           `;
-          iconSize = [18, 18];
-          iconAnchor = [9, 9];
+          iconSize = [20, 20];
+          iconAnchor = [10, 10];
         } else {
           // Intermediate Stop Dot
           iconHtml = `
-            <div style="background: #ffffff; border: 2px solid ${lineStyle.color}; width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></div>
+            <div style="background: #ffffff; border: 2.5px solid ${lineStyle.color}; width: 11px; height: 11px; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.25);"></div>
           `;
-          iconSize = [10, 10];
-          iconAnchor = [5, 5];
+          iconSize = [11, 11];
+          iconAnchor = [5.5, 5.5];
         }
 
         const marker = L.marker([stop.lat, stop.lon], {

@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Bus, Eye, EyeOff, AlertCircle, LogIn, Zap } from 'lucide-react';
 import { supabaseAuth } from '../lib/supabase';
+import heroBgImage from '../assets/hero-delhi-transit.jpg';
 import '../styles/auth.css';
 
 export const SignInPage: React.FC = () => {
@@ -30,7 +31,7 @@ export const SignInPage: React.FC = () => {
         const msg = authError.message || authError.error_description || 'Sign-in failed. Check your credentials.';
         setError(msg);
       } else if (session) {
-        navigate('/');
+        navigate('/planner');
       }
     } catch (err: any) {
       setError(err.message || 'Unexpected error. Please try again.');
@@ -41,11 +42,24 @@ export const SignInPage: React.FC = () => {
 
   const handleDemo = () => {
     supabaseAuth.signInDemo();
-    navigate('/');
+    navigate('/planner');
   };
 
   return (
     <div className="auth-page">
+      {/* Background Illustration Canvas with Delhi Transit Artwork */}
+      <div
+        className="auth-bg-media"
+        style={{ backgroundImage: `url(${heroBgImage})` }}
+        role="img"
+        aria-label="Delhi Transit Network illustration with Metro, DTC electric bus and India Gate at sunrise"
+      />
+
+      {/* 3-Layer Atmospheric Color Grading Scrims */}
+      <div className="auth-scrim-primary" />
+      <div className="auth-scrim-vertical" />
+      <div className="auth-scrim-warmth" />
+
       {/* ── Left: branding panel ── */}
       <div className="auth-brand">
         <div className="auth-brand-top">

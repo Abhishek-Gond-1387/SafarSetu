@@ -8,7 +8,63 @@
   min-height: 100vh;
   display: flex;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background: #0a1628;
+  position: relative;
+  overflow: hidden;
+  background-color: #0b172c;
+}
+
+.auth-bg-media {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  z-index: 0;
+}
+
+/* Color Grading Layer 1: Subtle Left-to-Right Scrim so full illustration shines through */
+.auth-scrim-primary {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(10, 24, 46, 0.6) 0%,
+    rgba(12, 28, 54, 0.3) 38%,
+    rgba(14, 34, 66, 0.1) 65%,
+    rgba(15, 23, 42, 0.16) 100%
+  );
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Color Grading Layer 2: Subtle Edge Vignette */
+.auth-scrim-vertical {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 24, 46, 0.25) 0%,
+    transparent 30%,
+    transparent 75%,
+    rgba(10, 24, 46, 0.35) 100%
+  );
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Color Grading Layer 3: Warm Sunrise Horizon Glow matching the illustration */
+.auth-scrim-warmth {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 75%,
+    rgba(254, 215, 170, 0.25) 0%,
+    rgba(253, 186, 116, 0.1) 35%,
+    transparent 70%
+  );
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* ── Left branding panel ─────────────────────────────────── */
@@ -17,7 +73,8 @@
   flex: 1;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(145deg, #0a1628 0%, #0f4c3a 40%, #0f766e 75%, #0284c7 100%);
+  background: transparent;
+  z-index: 2;
 }
 
 @media (min-width: 900px) {
@@ -25,7 +82,7 @@
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: 3rem;
+    padding: 3.5rem 3.5rem 3rem;
   }
 }
 
@@ -182,29 +239,40 @@
   color: rgba(255,255,255,0.35);
 }
 
-/* ── Right form panel ────────────────────────────────────── */
+/* ── Right form panel (Fully transparent so the entire illustration is visible) ── */
 .auth-form-panel {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
   width: 100%;
-  padding: 2rem 1.25rem;
-  background: #ffffff;
+  padding: 2.5rem 1.5rem;
+  background: transparent;
+  border-left: none;
 }
 
 @media (min-width: 900px) {
   .auth-form-panel {
-    width: 460px;
-    min-width: 460px;
+    width: 480px;
+    min-width: 480px;
     flex-shrink: 0;
   }
 }
 
+/* Translucent glassmorphism sign-in card with reduced opacity */
 .auth-form-box {
   width: 100%;
-  max-width: 400px;
+  max-width: 415px;
+  background: rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  border-radius: 20px;
+  padding: 2.25rem 2rem;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.25);
 }
 
 /* Mobile logo (shown when brand panel hidden) */
@@ -250,48 +318,55 @@
 }
 
 .auth-form-heading h2 {
-  font-size: 1.6rem;
-  font-weight: 800;
+  font-size: 1.65rem;
+  font-weight: 850;
   color: #0f172a;
   line-height: 1.2;
+  letter-spacing: -0.02em;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
 }
 
 .auth-form-heading p {
   margin-top: 0.4rem;
   font-size: 0.9rem;
-  color: #64748b;
+  color: #1e293b;
+  font-weight: 600;
   line-height: 1.5;
 }
 
 /* ── Form controls ─────────────────────────────────────────── */
 .auth-field {
-  margin-bottom: 1.1rem;
+  margin-bottom: 1.15rem;
 }
 
 .auth-field label {
   display: block;
   font-size: 0.83rem;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 0.35rem;
+  font-weight: 750;
+  color: #0f172a;
+  margin-bottom: 0.4rem;
+  letter-spacing: 0.01em;
 }
 
 .auth-input {
   width: 100%;
-  padding: 0.7rem 0.9rem;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 8px;
+  padding: 0.72rem 0.95rem;
+  border: 1.5px solid rgba(255, 255, 255, 0.65);
+  border-radius: 10px;
   font-size: 0.93rem;
+  font-weight: 600;
   color: #0f172a;
-  background: #f8fafc;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: all 0.2s ease;
   outline: none;
 }
 
 .auth-input:focus {
   border-color: #0f766e;
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(15,118,110,0.1);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.2);
 }
 
 .auth-input::placeholder {
@@ -392,8 +467,9 @@
   align-items: center;
   gap: 0.75rem;
   margin: 1.25rem 0;
-  color: #94a3b8;
-  font-size: 0.8rem;
+  color: #1e293b;
+  font-weight: 700;
+  font-size: 0.82rem;
 }
 
 .auth-divider::before,
@@ -401,21 +477,23 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: #e2e8f0;
+  background: rgba(0, 0, 0, 0.18);
 }
 
 /* Demo/secondary button */
 .auth-btn-secondary {
   width: 100%;
   padding: 0.72rem;
-  background: #f8fafc;
-  color: #374151;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.65);
+  color: #0f172a;
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
   font-size: 0.88rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -423,28 +501,30 @@
 }
 
 .auth-btn-secondary:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
 }
 
 /* Switch auth link */
 .auth-switch {
   text-align: center;
   margin-top: 1.5rem;
-  font-size: 0.87rem;
-  color: #64748b;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #1e293b;
 }
 
 .auth-switch a,
 .auth-switch button {
   color: #0f766e;
-  font-weight: 600;
+  font-weight: 750;
   background: none;
   border: none;
   cursor: pointer;
   padding: 0;
   font-size: inherit;
-  text-decoration: none;
+  text-decoration: underline;
   transition: color 0.15s;
 }
 

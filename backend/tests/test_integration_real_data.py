@@ -95,7 +95,7 @@ def test_real_delhi_route_planning(real_delhi_context):
     assert j.legs[0].to_stop_id == dest_id
     assert j.legs[0].mode.value == "bus"
     assert j.provenance_sources == ["mdb-1262"]
-    # Verify no fake fares
-    assert j.fare_complete is False
-    assert j.total_fare_inr is None
+    # Verify official DTC bus fare slab calculation
+    assert j.fare_complete is True
+    assert j.total_fare_inr == 5.0
 

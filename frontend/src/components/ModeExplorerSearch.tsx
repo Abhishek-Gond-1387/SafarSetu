@@ -488,10 +488,16 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
       {/* ── Header: Where do you want to go? ── */}
       <div className="explorer-header">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <h2 className="search-title" style={{ margin: 0 }}>
-            <Compass size={20} color="var(--primary)" />
-            <span>Where do you want to go?</span>
-          </h2>
+          <div>
+            <div className="section-step-indicator">
+              <span className="step-tag">Step 3 • Journey Selection</span>
+              <span className="step-tag-hindi">मार्ग चयन</span>
+            </div>
+            <h2 className="search-title" style={{ margin: '0.4rem 0 0 0' }}>
+              <Compass size={22} color="var(--primary)" />
+              <span>Where do you want to go?</span>
+            </h2>
+          </div>
 
           {isLocationDisabled ? (
             <button
@@ -515,8 +521,8 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
             </button>
           )}
         </div>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
-          Enter any landmark, monument, or college (e.g. <strong>MAIT</strong>, <strong>DU</strong>, <strong>Red Fort</strong>) to view all transportation modes and route paths.
+        <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginTop: '0.45rem' }}>
+          Select or search any destination landmark, college, or monument across Delhi/NCR to compare all transit modes.
         </p>
       </div>
 
@@ -720,9 +726,29 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
       </div>
 
       {isExploring && (
-        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-          <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 0.5rem auto' }} />
-          <div>Comparing transportation modes, distance & official fares from your location...</div>
+        <div className="journey-searching-state">
+          <Loader2 size={28} className="animate-spin" style={{ margin: '0 auto 0.75rem auto', color: 'var(--primary)' }} />
+          <div style={{ fontWeight: 700, fontSize: '0.98rem', color: '#0f172a', marginBottom: '0.25rem' }}>
+            Comparing Delhi Transit Modes &amp; Real-Time Fares...
+          </div>
+          <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
+            Evaluating Metro timetables, DTC bus routes, and first/last mile transfers from your location.
+          </div>
+        </div>
+      )}
+
+      {/* ── Journey Selection Step 3 Guide Banner (when no destination chosen yet) ── */}
+      {!modeData && !isExploring && (
+        <div className="journey-welcome-banner">
+          <div className="journey-welcome-icon-box">
+            <Sparkles size={24} color="#0284c7" />
+          </div>
+          <div className="journey-welcome-text">
+            <h4>Ready for Step 3: Choose Your Delhi Destination</h4>
+            <p>
+              Tap any quick landmark chip above (e.g. <strong>MAIT, Red Fort, Connaught Place</strong>) or type any college, monument, or metro station to compare all 5 Delhi transit modes with real-time timetables and official fares.
+            </p>
+          </div>
         </div>
       )}
 
@@ -944,20 +970,19 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
               {/* Plan / Refresh Journey Button */}
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-primary journey-update-route-btn"
                 onClick={handlePlanJourney}
                 disabled={isLoading}
-                style={{ width: '100%', marginTop: '1.1rem', padding: '0.75rem', fontSize: '0.95rem', fontWeight: 700 }}
               >
                 {isLoading ? (
                   <>
-                    <Loader2 size={16} className="animate-spin" />
-                    Finding Optimal Timetable & Routes...
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>Calculating Optimal Timetable &amp; Transfers...</span>
                   </>
                 ) : (
                   <>
                     <span>Update Route for {currentModeOption.title}</span>
-                    <ArrowRight size={16} />
+                    <ArrowRight size={18} className="btn-arrow-icon" />
                   </>
                 )}
               </button>

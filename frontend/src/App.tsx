@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import {
   Header,
 } from './components/Header';
+import { UnifiedWorkflowHero } from './components/UnifiedWorkflowHero';
 import { DataFreshnessBanner } from './components/DataFreshnessBanner';
 import { JourneySearch } from './components/JourneySearch';
 import { ModeExplorerSearch } from './components/ModeExplorerSearch';
@@ -15,6 +16,7 @@ import { MetroStatusModal } from './components/MetroStatusModal';
 import { SignInPage } from './pages/SignInPage';
 import { SignUpPage } from './pages/SignUpPage';
 import { AccountPage } from './pages/AccountPage';
+import { WelcomeLandingPage } from './pages/WelcomeLandingPage';
 import {
   SafarSetuAPI,
   HealthResponse,
@@ -77,6 +79,7 @@ const PlannerPage: React.FC<{
   onCloseMetro: () => void;
   onSignOut: () => void;
   onOpenAccount: () => void;
+  onOpenAuth: () => void;
   emergencyRerouteInfo: { stop_name: string; original_origin: string } | null;
   onDismissEmergency: () => void;
   onRerouteFromStop: (stop: { stop_id: string; stop_name: string; lat?: number; lon?: number }) => void;
@@ -107,6 +110,7 @@ const PlannerPage: React.FC<{
   onCloseMetro,
   onSignOut,
   onOpenAccount,
+  onOpenAuth,
   emergencyRerouteInfo,
   onDismissEmergency,
   onRerouteFromStop,
@@ -127,7 +131,7 @@ const PlannerPage: React.FC<{
       <Header
         session={session}
         realtimeStatus={realtimeStatus}
-        onOpenAuth={() => {}}   /* auth is now page-based; sign-in is /signin */
+        onOpenAuth={onOpenAuth}
         onSignOut={onSignOut}
         onOpenSaved={onOpenSaved}
         onOpenPreferences={onOpenPref}
@@ -139,8 +143,19 @@ const PlannerPage: React.FC<{
       {/* Freshness Banner */}
       <DataFreshnessBanner health={health} />
 
-      {/* Main Commuter Workspace */}
-      <main className="container app-main">
+      {/* Step 1 & Step 2: Unified First-Visit Hero with Background, Exact Text & Inline Authentication */}
+      <UnifiedWorkflowHero
+        session={session}
+        onProceedToJourney={() => {
+          const el = document.getElementById('planner-explorer-section');
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }}
+      />
+
+      {/* Step 3: Main Journey Selection & Routing Workspace */}
+      <main className="container app-main" id="planner-explorer-section">
         {backendError && (
           <div className="alert-box alert-danger" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
             <ServerCrash size={20} />
@@ -244,22 +259,17 @@ const PlannerPage: React.FC<{
               <div className="results-layout-with-map" style={{ marginTop: '1.5rem' }}>
                 {/* Left Column: Route Cards */}
                 <div className="routes-list-column">
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      marginBottom: '0.75rem',
-                      paddingBottom: '0.6rem',
-                      borderBottom: '1.5px solid var(--border)',
-                    }}
-                  >
+                  <div className="routes-header-bar">
                     <div>
-                      <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+                      <div className="routes-step-badge">
+                        <span className="live-dot" />
+                        <span>Step 3 • Live Transit Solutions</span>
+                      </div>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 850, margin: '0.35rem 0 0 0', color: '#0f172a' }}>
                         {routePlan.journeys.length} Route Choice{routePlan.journeys.length > 1 ? 's' : ''} Available
                       </h3>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Ranked by {routePlan.criterion} &bull; Click any card to highlight route on the map
+                      <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                        Optimized by {routePlan.criterion} &bull; Click any card below to synchronize with live interactive Delhi map
                       </span>
                     </div>
                   </div>
@@ -289,11 +299,13 @@ const PlannerPage: React.FC<{
                 <div className="map-side-column">
                   <div className="map-sticky-card">
                     <div className="map-card-bar">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <div className="pulse-dot" style={{ background: '#10b981', width: 8, height: 8 }} />
-                        <strong style={{ fontSize: '0.88rem', color: 'var(--text-main)' }}>Interactive Route Map</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <div className="pulse-dot" style={{ background: '#34d399', width: 9, height: 9 }} />
+                        <strong style={{ fontSize: '0.92rem', color: '#ffffff', letterSpacing: '-0.01em' }}>
+                          Interactive Delhi Transit Map
+                        </strong>
                       </div>
-                      <span style={{ fontSize: '0.78rem', background: '#e2e8f0', color: '#1e293b', padding: '0.2rem 0.6rem', borderRadius: '4px', fontWeight: 700 }}>
+                      <span className="map-route-counter-pill">
                         Viewing Route {selectedJourneyIndex + 1} of {routePlan.journeys.length}
                       </span>
                     </div>
@@ -670,9 +682,65 @@ export const App: React.FC = () => {
 
   return (
     <Routes>
-      {/* Public auth routes */}
+      {/* ── Main Site Landing: Displays the 3-Step Continuous Unified Flow ── */}
+      <Route
+        path="/"
+        element={
+          <PlannerPage
+            session={session}
+            health={health}
+            realtimeStatus={realtimeStatus}
+            backendError={backendError}
+            isPlanning={isPlanning}
+            routePlan={routePlan}
+            planError={planError}
+            selectedOrigin={selectedOrigin}
+            selectedDest={selectedDest}
+            savedOpen={savedOpen}
+            prefOpen={prefOpen}
+            feedbackOpen={feedbackOpen}
+            metroOpen={metroOpen}
+            onPlanRoute={handlePlanRoute}
+            onSaveJourney={handleSaveJourney}
+            onOpenSaved={() => setSavedOpen(true)}
+            onCloseSaved={() => setSavedOpen(false)}
+            onOpenPref={() => setPrefOpen(true)}
+            onClosePref={() => setPrefOpen(false)}
+            onOpenFeedback={() => setFeedbackOpen(true)}
+            onCloseFeedback={() => setFeedbackOpen(false)}
+            onOpenMetro={() => setMetroOpen(true)}
+            onCloseMetro={() => setMetroOpen(false)}
+            onSignOut={handleSignOut}
+            onOpenAccount={() => navigate('/account')}
+            onOpenAuth={() => navigate('/signin')}
+            emergencyRerouteInfo={emergencyRerouteInfo}
+            onDismissEmergency={() => setEmergencyRerouteInfo(null)}
+            onRerouteFromStop={handleRerouteFromStop}
+            onRerouteFromGPS={handleRerouteFromGPS}
+          />
+        }
+      />
+
+      {/* ── Direct Route for Standalone Welcome Screen (if visited directly) ── */}
+      <Route
+        path="/welcome"
+        element={
+          <WelcomeLandingPage
+            session={session}
+            realtimeStatus={realtimeStatus}
+          />
+        }
+      />
+
+      {/* ── Standalone Sign In / Sign Up Pages ── */}
       <Route path="/signin" element={<SignInPage />} />
       <Route path="/signup" element={<SignUpPage />} />
+
+      {/* ── Route Alias for /planner ── */}
+      <Route
+        path="/planner"
+        element={<Navigate to="/" replace />}
+      />
 
       {/* Protected account settings */}
       <Route
@@ -680,46 +748,6 @@ export const App: React.FC = () => {
         element={
           <ProtectedRoute session={session}>
             <AccountPage session={session} />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* Protected main planner — default landing after login */}
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute session={session}>
-            <PlannerPage
-              session={session}
-              health={health}
-              realtimeStatus={realtimeStatus}
-              backendError={backendError}
-              isPlanning={isPlanning}
-              routePlan={routePlan}
-              planError={planError}
-              selectedOrigin={selectedOrigin}
-              selectedDest={selectedDest}
-              savedOpen={savedOpen}
-              prefOpen={prefOpen}
-              feedbackOpen={feedbackOpen}
-              metroOpen={metroOpen}
-              onPlanRoute={handlePlanRoute}
-              onSaveJourney={handleSaveJourney}
-              onOpenSaved={() => setSavedOpen(true)}
-              onCloseSaved={() => setSavedOpen(false)}
-              onOpenPref={() => setPrefOpen(true)}
-              onClosePref={() => setPrefOpen(false)}
-              onOpenFeedback={() => setFeedbackOpen(true)}
-              onCloseFeedback={() => setFeedbackOpen(false)}
-              onOpenMetro={() => setMetroOpen(true)}
-              onCloseMetro={() => setMetroOpen(false)}
-              onSignOut={handleSignOut}
-              onOpenAccount={() => navigate('/account')}
-              emergencyRerouteInfo={emergencyRerouteInfo}
-              onDismissEmergency={() => setEmergencyRerouteInfo(null)}
-              onRerouteFromStop={handleRerouteFromStop}
-              onRerouteFromGPS={handleRerouteFromGPS}
-            />
           </ProtectedRoute>
         }
       />

@@ -137,6 +137,8 @@ def test_unreachable_destination(mini_transit_network):
 
 def test_unknown_fare_not_treated_as_zero(mini_transit_network):
     dataset, graph, router = mini_transit_network
+    # Invalidate stop coordinates to simulate unavailable stop coordinates where distance cannot be determined
+    dataset.stops["A"].stop_lat = None
     journeys, _ = router.plan_journey(
         origin_stop_id="A",
         destination_stop_id="C",
@@ -145,7 +147,7 @@ def test_unknown_fare_not_treated_as_zero(mini_transit_network):
     )
     assert len(journeys) >= 1
     j = journeys[0]
-    # In genuine feeds without fare data, fare must be None and fare_complete False
+    # In feeds without fare data or coordinates, fare must be None and fare_complete False
     assert j.total_fare_inr is None
     assert j.fare_complete is False
     assert any("Fare information is not available" in w for w in j.warnings)

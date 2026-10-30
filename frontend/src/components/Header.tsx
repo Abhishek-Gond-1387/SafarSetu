@@ -37,10 +37,13 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="container header-content">
         <div className="logo-group">
           <div className="logo-icon" aria-hidden="true">
-            <Bus size={22} />
+            <Bus size={20} />
           </div>
           <div className="logo-text">
-            <h1>SafarSetu</h1>
+            <div className="logo-title-row">
+              <h1>SafarSetu</h1>
+              <span className="logo-hindi-pill">सफ़रसेतु</span>
+            </div>
             <span>Delhi / NCR Multimodal Transit</span>
           </div>
         </div>

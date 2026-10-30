@@ -23,13 +23,15 @@ class RoutingEngine:
     @staticmethod
     def calculate_transit_fare(
         mode: LegMode,
-        from_lat: float,
-        from_lon: float,
-        to_lat: float,
-        to_lon: float,
+        from_lat: Optional[float],
+        from_lon: Optional[float],
+        to_lat: Optional[float],
+        to_lon: Optional[float],
         route_name: Optional[str] = None,
-    ) -> float:
+    ) -> Optional[float]:
         """Calculate official Delhi transit fares (DMRC distance slabs or DTC bus slabs)."""
+        if from_lat is None or from_lon is None or to_lat is None or to_lon is None:
+            return None
         d_km = haversine_meters(from_lat, from_lon, to_lat, to_lon) / 1000.0
         if mode == LegMode.METRO:
             if d_km <= 2.0:
