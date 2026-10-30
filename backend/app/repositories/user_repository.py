@@ -49,6 +49,7 @@ class InMemoryUserDataStore:
                     "id": user_id,
                     "email": email,
                     "display_name": None,
+                    "gender": None,
                     "preferred_language": "en",
                     "created_at": now,
                     "updated_at": now,
@@ -64,6 +65,7 @@ class InMemoryUserDataStore:
                     "id": user_id,
                     "email": None,
                     "display_name": None,
+                    "gender": None,
                     "preferred_language": "en",
                     "created_at": now,
                     "updated_at": now,
@@ -71,6 +73,8 @@ class InMemoryUserDataStore:
             row = self.profiles[user_id]
             if update.display_name is not None:
                 row["display_name"] = update.display_name
+            if update.gender is not None:
+                row["gender"] = update.gender
             if update.preferred_language is not None:
                 row["preferred_language"] = update.preferred_language.value
             row["updated_at"] = datetime.now(timezone.utc)
@@ -245,7 +249,13 @@ class UserRepository:
         return cls._in_memory_store
 
     @classmethod
-    def register_user(cls, email: str, password: str, display_name: Optional[str] = None) -> Tuple[UUID, str, Optional[str]]:
+    def register_user(
+        cls,
+        email: str,
+        password: str,
+        display_name: Optional[str] = None,
+        gender: Optional[str] = None,
+    ) -> Tuple[UUID, str, Optional[str], Optional[str]]:
         supabase = get_supabase_client()
         if not supabase:
             user_id = uuid4()
@@ -253,6 +263,7 @@ class UserRepository:
                 "id": user_id,
                 "email": email,
                 "display_name": display_name,
+                "gender": gender,
                 "preferred_language": "en",
                 "created_at": datetime.now(timezone.utc),
                 "updated_at": datetime.now(timezone.utc),
@@ -266,25 +277,35 @@ class UserRepository:
                 "created_at": datetime.now(timezone.utc),
                 "updated_at": datetime.now(timezone.utc),
             }
-            return user_id, email, display_name
+            return user_id, email, display_name, gender
 
         try:
+            meta = {}
+            if display_name:
+                meta["full_name"] = display_name
+            if gender:
+                meta["gender"] = gender
+
             res = supabase.auth.admin.create_user({
                 "email": email,
                 "password": password,
                 "email_confirm": True,
-                "user_metadata": {"full_name": display_name} if display_name else {},
+                "user_metadata": meta,
             })
             if not res or not res.user:
                 raise ValueError("Supabase auth did not return a user")
             user_id = UUID(res.user.id)
 
-            # Ensure row in public.profiles table exists
-            supabase.table("profiles").upsert({
+            # Ensure row in public.profiles table exists with gender
+            profile_data = {
                 "id": str(user_id),
                 "display_name": display_name,
                 "preferred_language": "en",
-            }).execute()
+            }
+            if gender:
+                profile_data["gender"] = gender
+
+            supabase.table("profiles").upsert(profile_data).execute()
 
             # Ensure row in public.user_preferences table exists
             supabase.table("user_preferences").upsert({
@@ -295,7 +316,7 @@ class UserRepository:
                 "wheelchair_accessible": False,
             }).execute()
 
-            return user_id, email, display_name
+            return user_id, email, display_name, gender
         except Exception as e:
             err_msg = str(e)
             if "already registered" in err_msg.lower() or "unique constraint" in err_msg.lower() or "already exists" in err_msg.lower():
@@ -347,6 +368,8 @@ class UserRepository:
         payload = {}
         if update.display_name is not None:
             payload["display_name"] = update.display_name
+        if update.gender is not None:
+            payload["gender"] = update.gender
         if update.preferred_language is not None:
             payload["preferred_language"] = update.preferred_language.value
 

@@ -22,6 +22,7 @@ interface AccountPageProps {
 export const AccountPage: React.FC<AccountPageProps> = ({ session }) => {
   const navigate = useNavigate();
   const [displayName, setDisplayName] = useState(session?.user?.display_name || '');
+  const [gender, setGender] = useState(session?.user?.gender || '');
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -33,6 +34,13 @@ export const AccountPage: React.FC<AccountPageProps> = ({ session }) => {
   useEffect(() => {
     if (!session) {
       navigate('/signin');
+    } else {
+      SafarSetuAPI.getCurrentUser()
+        .then((res: any) => {
+          if (res?.profile?.gender) setGender(res.profile.gender);
+          if (res?.profile?.display_name && !displayName) setDisplayName(res.profile.display_name);
+        })
+        .catch(() => {});
     }
   }, [session, navigate]);
 
@@ -47,7 +55,10 @@ export const AccountPage: React.FC<AccountPageProps> = ({ session }) => {
     setSaveMsg(null);
     setSaving(true);
     try {
-      await SafarSetuAPI.updateProfile({ display_name: displayName.trim() || undefined });
+      await SafarSetuAPI.updateProfile({
+        display_name: displayName.trim() || undefined,
+        gender: gender || undefined,
+      });
       setSaveMsg({ type: 'success', text: 'Profile updated successfully.' });
     } catch (err: any) {
       setSaveMsg({ type: 'error', text: err.message || 'Failed to update profile.' });
@@ -124,6 +135,49 @@ export const AccountPage: React.FC<AccountPageProps> = ({ session }) => {
                 placeholder="Your name"
                 disabled={saving}
               />
+            </div>
+            <div className="auth-field" style={{ marginBottom: '1.25rem' }}>
+              <label>
+                Gender <span style={{ color: '#94a3b8', fontWeight: 400 }}>(used for HerRoute women safety insights)</span>
+              </label>
+              <div className="gender-selector-grid" style={{ marginTop: '0.35rem' }}>
+                <button
+                  type="button"
+                  className={`gender-option-btn ${gender === 'female' ? 'active' : ''}`}
+                  onClick={() => { setGender(gender === 'female' ? '' : 'female'); setSaveMsg(null); }}
+                  disabled={saving}
+                >
+                  <span className="gender-icon">👩</span>
+                  <span>Female</span>
+                </button>
+                <button
+                  type="button"
+                  className={`gender-option-btn ${gender === 'male' ? 'active' : ''}`}
+                  onClick={() => { setGender(gender === 'male' ? '' : 'male'); setSaveMsg(null); }}
+                  disabled={saving}
+                >
+                  <span className="gender-icon">👨</span>
+                  <span>Male</span>
+                </button>
+                <button
+                  type="button"
+                  className={`gender-option-btn ${gender === 'other' ? 'active' : ''}`}
+                  onClick={() => { setGender(gender === 'other' ? '' : 'other'); setSaveMsg(null); }}
+                  disabled={saving}
+                >
+                  <span className="gender-icon">⚧️</span>
+                  <span>Other</span>
+                </button>
+                <button
+                  type="button"
+                  className={`gender-option-btn ${gender === 'prefer_not_to_say' ? 'active' : ''}`}
+                  onClick={() => { setGender(gender === 'prefer_not_to_say' ? '' : 'prefer_not_to_say'); setSaveMsg(null); }}
+                  disabled={saving}
+                >
+                  <span className="gender-icon">🔒</span>
+                  <span>Prefer not to say</span>
+                </button>
+              </div>
             </div>
             <div className="account-info-row">
               <span className="account-info-label">Email</span>

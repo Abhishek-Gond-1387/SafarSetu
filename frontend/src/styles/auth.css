@@ -852,3 +852,97 @@
   margin-top: 0.25rem;
   color: #94a3b8;
 }
+
+/* ── Gender Selection Pills ──────────────────────────────────── */
+.gender-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.gender-option-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.gender-option-btn:hover:not(:disabled) {
+  border-color: #0d9488;
+  background: #f0fdfa;
+  color: #0f766e;
+}
+
+.gender-option-btn.active {
+  border-color: #0d9488;
+  background: #0d9488;
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(13, 148, 136, 0.25);
+}
+
+.gender-option-btn .gender-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.gender-option-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Gender Selection Pills ──────────────────────────────────── */
+.gender-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.gender-option-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.gender-option-btn:hover:not(:disabled) {
+  border-color: #0d9488;
+  background: #f0fdfa;
+  color: #0f766e;
+}
+
+.gender-option-btn.active {
+  border-color: #0d9488;
+  background: #0d9488;
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(13, 148, 136, 0.25);
+}
+
+.gender-option-btn .gender-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.gender-option-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

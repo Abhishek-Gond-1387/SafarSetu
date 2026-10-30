@@ -14,6 +14,7 @@ import { MetroStatusModal } from './components/MetroStatusModal';
 import { LogoutConfirmModal } from './components/LogoutConfirmModal';
 import { VoiceAssistantModal } from './components/VoiceAssistantModal';
 import { LostAssistanceModal } from './components/LostAssistanceModal';
+import { SafetyFeedbackModal } from './components/SafetyFeedbackModal';
 import { SignInPage } from './pages/SignInPage';
 import { SignUpPage } from './pages/SignUpPage';
 import { AccountPage } from './pages/AccountPage';
@@ -88,6 +89,7 @@ const PlannerPage: React.FC<{
   onRerouteFromGPS: () => void;
   onOpenVoice?: () => void;
   onOpenLost?: () => void;
+  onOpenSafetyFeedback?: (journey?: Journey) => void;
 }> = ({
   session,
   health,
@@ -121,6 +123,7 @@ const PlannerPage: React.FC<{
   onRerouteFromGPS,
   onOpenVoice,
   onOpenLost,
+  onOpenSafetyFeedback,
 }) => {
   const isPlannerRoute = useLocation().pathname === '/planner';
   const [searchMode, setSearchMode] = useState<'explorer' | 'standard'>('explorer');
@@ -147,6 +150,7 @@ const PlannerPage: React.FC<{
         onOpenMetroStatus={onOpenMetro}
         onOpenVoice={onOpenVoice}
         onOpenLost={onOpenLost}
+        onOpenSafetyFeedback={onOpenSafetyFeedback}
       />
 
       <div className="app-main-content">
@@ -537,6 +541,8 @@ export const App: React.FC = () => {
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [voiceAssistantOpen, setVoiceAssistantOpen] = useState(false);
   const [lostModalOpen, setLostModalOpen] = useState(false);
+  const [safetyModalOpen, setSafetyModalOpen] = useState(false);
+  const [feedbackTargetJourney, setFeedbackTargetJourney] = useState<Journey | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Initialize Auth Listener & Health Fetch
@@ -740,6 +746,10 @@ export const App: React.FC = () => {
       onRerouteFromGPS={handleRerouteFromGPS}
       onOpenVoice={() => setVoiceAssistantOpen(true)}
       onOpenLost={() => setLostModalOpen(true)}
+      onOpenSafetyFeedback={(j) => {
+        setFeedbackTargetJourney(j || routePlan?.journeys?.[0] || null);
+        setSafetyModalOpen(true);
+      }}
     />
   );
 
@@ -778,6 +788,16 @@ export const App: React.FC = () => {
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+
+      <SafetyFeedbackModal
+        isOpen={safetyModalOpen}
+        onClose={() => setSafetyModalOpen(false)}
+        journey={feedbackTargetJourney}
+        originName={selectedOrigin?.stop_name || routePlan?.origin_stop_id}
+        destinationName={selectedDest?.stop_name || routePlan?.destination_stop_id}
+        isAuthenticated={Boolean(session)}
+        requireAuth={() => navigate('/signin')}
+      />
 
       <LostAssistanceModal
         isOpen={lostModalOpen}

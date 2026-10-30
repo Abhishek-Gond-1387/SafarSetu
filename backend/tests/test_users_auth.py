@@ -332,3 +332,40 @@ def test_recent_searches_retention_and_clear():
     # Verify empty after clearing
     res_empty = client.get("/api/v1/users/me/recent-searches", headers=auth_header)
     assert res_empty.json()["total"] == 0
+
+
+# ─── User Signup & Gender Field Tests ─────────────────────────────────────────
+
+def test_signup_with_gender():
+    """Verify signup accepts gender (male, female, other) and returns it in profile."""
+    # 1. Signup with gender female
+    signup_payload = {
+        "email": "priya.sharma@example.com",
+        "password": "Password123!",
+        "display_name": "Priya Sharma",
+        "gender": "female",
+    }
+    res = client.post("/api/v1/users/signup", json=signup_payload)
+    assert res.status_code == 201
+    data = res.json()
+    assert data["email"] == "priya.sharma@example.com"
+    assert data["display_name"] == "Priya Sharma"
+    assert data["gender"] == "female"
+
+    # 2. Check profile reflects gender
+    user_id = data["user_id"]
+    token = make_token(user_id)
+    res_profile = client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {token}"})
+    assert res_profile.status_code == 200
+    profile_data = res_profile.json()["profile"]
+    assert profile_data["gender"] == "female"
+
+    # 3. Update gender via profile patch
+    patch_res = client.patch(
+        "/api/v1/users/me",
+        json={"gender": "prefer_not_to_say"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert patch_res.status_code == 200
+    assert patch_res.json()["gender"] == "prefer_not_to_say"
+

@@ -38,18 +38,27 @@ class ReviewStatus(str, Enum):
     DISMISSED = "dismissed"
 
 
+class GenderEnum(str, Enum):
+    MALE = "male"
+    FEMALE = "female"
+    OTHER = "other"
+    PREFER_NOT_TO_SAY = "prefer_not_to_say"
+
+
 # ─── Auth / Registration Schemas ──────────────────────────────────────────────
 
 class UserSignUpRequest(BaseModel):
     email: str = Field(..., description="Valid email address")
     password: str = Field(..., min_length=8, description="Password with minimum 8 characters")
     display_name: Optional[str] = Field(None, max_length=100, description="Optional commuter display name")
+    gender: Optional[str] = Field(None, description="Commuter gender: male, female, other, or prefer_not_to_say")
 
 
 class UserSignUpResponse(BaseModel):
     user_id: UUID
     email: str
     display_name: Optional[str] = None
+    gender: Optional[str] = None
     message: str = "User account created successfully."
 
 
@@ -59,6 +68,7 @@ class UserProfileOut(BaseModel):
     id: UUID
     email: Optional[str] = None
     display_name: Optional[str] = None
+    gender: Optional[str] = None
     preferred_language: str = "en"
     created_at: datetime
     updated_at: datetime
@@ -66,6 +76,7 @@ class UserProfileOut(BaseModel):
 
 class UserProfileUpdate(BaseModel):
     display_name: Optional[str] = Field(None, max_length=100)
+    gender: Optional[str] = Field(None, description="male, female, other, or prefer_not_to_say")
     preferred_language: Optional[SupportedLanguage] = None
 
 

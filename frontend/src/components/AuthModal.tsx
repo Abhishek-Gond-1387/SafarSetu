@@ -13,6 +13,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [gender, setGender] = useState<'female' | 'male' | 'other' | 'prefer_not_to_say' | ''>('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -33,7 +34,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           onClose();
         }
       } else {
-        const { user, error } = await supabaseAuth.signUp(email, password, displayName);
+        const { user, error } = await supabaseAuth.signUp(email, password, displayName, gender || undefined);
         if (error) {
           setErrorMsg(error.message || 'Failed to create account.');
         } else {
@@ -104,20 +105,62 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
 
           <form onSubmit={handleSubmit}>
             {tab === 'signup' && (
-              <div className="form-group">
-                <label className="form-label" htmlFor="display-name">
-                  Full Name / Display Name
-                </label>
-                <input
-                  id="display-name"
-                  type="text"
-                  className="form-input"
-                  style={{ paddingLeft: '0.75rem' }}
-                  placeholder="e.g. Rahul Sharma"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                />
-              </div>
+              <>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="display-name">
+                    Full Name / Display Name
+                  </label>
+                  <input
+                    id="display-name"
+                    type="text"
+                    className="form-input"
+                    style={{ paddingLeft: '0.75rem' }}
+                    placeholder="e.g. Rahul Sharma"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">
+                    Gender <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>
+                  </label>
+                  <div className="gender-selector-grid" style={{ marginTop: '0.25rem' }}>
+                    <button
+                      type="button"
+                      className={`gender-option-btn ${gender === 'female' ? 'active' : ''}`}
+                      onClick={() => setGender(gender === 'female' ? '' : 'female')}
+                    >
+                      <span className="gender-icon">👩</span>
+                      <span>Female</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`gender-option-btn ${gender === 'male' ? 'active' : ''}`}
+                      onClick={() => setGender(gender === 'male' ? '' : 'male')}
+                    >
+                      <span className="gender-icon">👨</span>
+                      <span>Male</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`gender-option-btn ${gender === 'other' ? 'active' : ''}`}
+                      onClick={() => setGender(gender === 'other' ? '' : 'other')}
+                    >
+                      <span className="gender-icon">⚧️</span>
+                      <span>Other</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`gender-option-btn ${gender === 'prefer_not_to_say' ? 'active' : ''}`}
+                      onClick={() => setGender(gender === 'prefer_not_to_say' ? '' : 'prefer_not_to_say')}
+                    >
+                      <span className="gender-icon">🔒</span>
+                      <span>Prefer not to say</span>
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
 
             <div className="form-group">

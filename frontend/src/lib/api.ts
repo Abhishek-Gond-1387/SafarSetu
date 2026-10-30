@@ -364,6 +364,68 @@ export interface VoiceLanguagesResponse {
   default: string;
 }
 
+
+// ── HerRoute: Women's Safety Community Feedback Types ───────────────────
+export type SafetyExperience = 'comfortable' | 'uncomfortable' | 'unsafe';
+export type SegmentType = 'walking' | 'metro' | 'bus' | 'auto' | 'station_interchange' | 'entire_journey';
+export type TimeCategory = 'daytime' | 'nighttime';
+
+export interface SafetyConcernCount {
+  concern_key: string;
+  label: string;
+  count: number;
+}
+
+export interface SafetyInsightsSummary {
+  identifier: string;
+  display_title?: string;
+  has_sufficient_data: boolean;
+  total_reports: number;
+  comfortable_count: number;
+  uncomfortable_count: number;
+  unsafe_count: number;
+  daytime_reports_count: number;
+  nighttime_reports_count: number;
+  frequent_concerns: SafetyConcernCount[];
+  time_context_notice?: string;
+  notice: string;
+}
+
+export interface RouteSafetyInsightsResponse {
+  route_id: string;
+  overall: SafetyInsightsSummary;
+  segments: Record<string, SafetyInsightsSummary>;
+  time_filter_applied: string;
+}
+
+export interface SafetyFeedbackSubmitRequest {
+  journey_id?: string;
+  route_id?: string;
+  segment_id: string;
+  segment_type: SegmentType;
+  segment_name?: string;
+  experience_rating: SafetyExperience;
+  safety_concerns?: string[];
+  feedback_text?: string;
+  time_category?: TimeCategory;
+}
+
+export interface SafetyFeedbackOut {
+  id: string;
+  user_id: string;
+  journey_id?: string;
+  route_id?: string;
+  segment_id: string;
+  segment_type: string;
+  segment_name?: string;
+  experience_rating: string;
+  safety_concerns: string[];
+  feedback_text?: string;
+  time_category: string;
+  created_at: string;
+  moderation_status: string;
+}
+
 export const SafarSetuAPI = {
   // Transit Search & Routing
   async searchStops(query: string, pageSize: number = 10): Promise<StopsSearchResponse> {
@@ -444,7 +506,7 @@ export const SafarSetuAPI = {
     return fetchJSON('/users/me');
   },
 
-  async updateProfile(data: { display_name?: string; preferred_language?: string }) {
+  async updateProfile(data: { display_name?: string; preferred_language?: string; gender?: string }) {
     return fetchJSON('/users/me', {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -527,5 +589,44 @@ export const SafarSetuAPI = {
 
   async getVoiceLanguages(): Promise<VoiceLanguagesResponse> {
     return fetchJSON<VoiceLanguagesResponse>('/voice/languages');
+  },
+
+  // HerRoute Women's Safety Community Feedback
+  async getRouteSafetyInsights(
+    routeId: string,
+    segmentIds?: string[],
+    timeFilter: string = 'all'
+  ): Promise<RouteSafetyInsightsResponse> {
+    const q = new URLSearchParams();
+    if (segmentIds && segmentIds.length > 0) {
+      q.append('segments', segmentIds.join(','));
+    }
+    if (timeFilter) {
+      q.append('time_filter', timeFilter);
+    }
+    const queryStr = q.toString() ? `?${q.toString()}` : '';
+    return fetchJSON<RouteSafetyInsightsResponse>(`/safety/routes/${encodeURIComponent(routeId)}${queryStr}`);
+  },
+
+  async getSegmentSafetyInsights(
+    segmentId: string,
+    timeFilter: string = 'all'
+  ): Promise<SafetyInsightsSummary> {
+    return fetchJSON<SafetyInsightsSummary>(
+      `/safety/segments/${encodeURIComponent(segmentId)}?time_filter=${encodeURIComponent(timeFilter)}`
+    );
+  },
+
+  async submitSafetyFeedback(
+    payload: SafetyFeedbackSubmitRequest
+  ): Promise<SafetyFeedbackOut> {
+    return fetchJSON<SafetyFeedbackOut>('/safety/feedback', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getMySafetyFeedback(limit: number = 50): Promise<{ items: SafetyFeedbackOut[]; total_count: number }> {
+    return fetchJSON<{ items: SafetyFeedbackOut[]; total_count: number }>(`/safety/my-feedback?limit=${limit}`);
   },
 };

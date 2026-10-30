@@ -40,15 +40,17 @@ def register_user(payload: UserSignUpRequest):
     the exact same credentials.
     """
     try:
-        user_id, email, display_name = UserRepository.register_user(
+        user_id, email, display_name, gender = UserRepository.register_user(
             email=payload.email,
             password=payload.password,
             display_name=payload.display_name,
+            gender=payload.gender,
         )
         return UserSignUpResponse(
             user_id=user_id,
             email=email,
             display_name=display_name,
+            gender=gender,
             message="User account registered successfully.",
         )
     except ValueError as e:

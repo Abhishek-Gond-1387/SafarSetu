@@ -34,6 +34,7 @@ export interface UserSession {
     id: string;
     email?: string;
     display_name?: string;
+    gender?: string;
   };
 }
 
@@ -113,7 +114,7 @@ export class SupabaseAuthClient {
     };
   }
 
-  public async signUp(email: string, password: string, displayName?: string): Promise<{ user: any; error: any }> {
+  public async signUp(email: string, password: string, displayName?: string, gender?: string): Promise<{ user: any; error: any }> {
     const apiBase = getApiBase();
     try {
       // 1. Register through SafarSetu backend which creates the user in Supabase auth with confirmed status
@@ -125,6 +126,7 @@ export class SupabaseAuthClient {
           email,
           password,
           display_name: displayName || undefined,
+          gender: gender || undefined,
         }),
       });
 
@@ -132,7 +134,7 @@ export class SupabaseAuthClient {
         // 2. Immediately sign in with the exact same credentials to acquire the valid Supabase JWT session!
         const { session, error: signInErr } = await this.signIn(email, password);
         if (signInErr) {
-          return { user: { email, display_name: displayName }, error: null };
+          return { user: { email, display_name: displayName, gender }, error: null };
         }
         return { user: session?.user, error: null };
       }
@@ -153,7 +155,10 @@ export class SupabaseAuthClient {
             body: JSON.stringify({
               email,
               password,
-              data: displayName ? { full_name: displayName } : {},
+              data: {
+                full_name: displayName || undefined,
+                gender: gender || undefined,
+              },
             }),
           });
           const data = await res.json();

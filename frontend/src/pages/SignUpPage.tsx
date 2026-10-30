@@ -31,6 +31,7 @@ function barClass(barIdx: number, score: number): string {
 export const SignUpPage: React.FC = () => {
   const navigate = useNavigate();
   const [displayName, setDisplayName] = useState('');
+  const [gender, setGender] = useState<'female' | 'male' | 'other' | 'prefer_not_to_say' | ''>('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
@@ -59,6 +60,7 @@ export const SignUpPage: React.FC = () => {
         email.trim(),
         password,
         displayName.trim() || undefined,
+        gender || undefined,
       );
       if (authError) {
         const msg = authError.message || authError.error_description || 'Registration failed.';
@@ -203,6 +205,50 @@ export const SignUpPage: React.FC = () => {
                   disabled={loading}
                   autoFocus
                 />
+              </div>
+
+              <div className="auth-field">
+                <label>
+                  Gender <span style={{ color: '#94a3b8', fontWeight: 400 }}>(optional &bull; helps personalize HerRoute safety insights)</span>
+                </label>
+                <div className="gender-selector-grid" role="group" aria-label="Select gender">
+                  <button
+                    type="button"
+                    className={`gender-option-btn ${gender === 'female' ? 'active' : ''}`}
+                    onClick={() => setGender(gender === 'female' ? '' : 'female')}
+                    disabled={loading}
+                  >
+                    <span className="gender-icon" aria-hidden="true">👩</span>
+                    <span>Female</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`gender-option-btn ${gender === 'male' ? 'active' : ''}`}
+                    onClick={() => setGender(gender === 'male' ? '' : 'male')}
+                    disabled={loading}
+                  >
+                    <span className="gender-icon" aria-hidden="true">👨</span>
+                    <span>Male</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`gender-option-btn ${gender === 'other' ? 'active' : ''}`}
+                    onClick={() => setGender(gender === 'other' ? '' : 'other')}
+                    disabled={loading}
+                  >
+                    <span className="gender-icon" aria-hidden="true">⚧️</span>
+                    <span>Other</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`gender-option-btn ${gender === 'prefer_not_to_say' ? 'active' : ''}`}
+                    onClick={() => setGender(gender === 'prefer_not_to_say' ? '' : 'prefer_not_to_say')}
+                    disabled={loading}
+                  >
+                    <span className="gender-icon" aria-hidden="true">🔒</span>
+                    <span>Prefer not to say</span>
+                  </button>
+                </div>
               </div>
 
               <div className="auth-field">

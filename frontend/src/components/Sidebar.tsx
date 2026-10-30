@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Bus,
+  Shield,
   LifeBuoy,
   Bookmark,
   Settings,
@@ -36,6 +37,7 @@ export interface SidebarProps {
   onOpenMetroStatus?: () => void;
   onOpenVoice?: () => void;
   onOpenLost?: () => void;
+  onOpenSafetyFeedback?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -50,6 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenMetroStatus,
   onOpenVoice,
   onOpenLost,
+  onOpenSafetyFeedback,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [pwaState, setPwaState] = useState<PWAState>({
@@ -431,6 +434,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <LifeBuoy size={18} />
                 <span>Lost Button</span>
+              </button>
+            )}
+
+            {onOpenSafetyFeedback && (
+              <button
+                type="button"
+                className="drawer-nav-item drawer-herroute-nav-btn"
+                onClick={() => handleNavClick(onOpenSafetyFeedback)}
+                title="HerRoute: Share journey safety feedback or view women travelers community insights"
+              >
+                <Shield size={18} />
+                <span>HerRoute (Women's Safety)</span>
+                <span className="herroute-nav-tag">SAFETY</span>
               </button>
             )}
 

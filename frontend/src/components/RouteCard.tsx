@@ -1,3 +1,4 @@
+import { CommunitySafetyCard } from './CommunitySafetyCard';
 import React, { useState } from 'react';
 import {
   Bus,
@@ -64,6 +65,7 @@ interface RouteCardProps {
   activeLegIndex?: number | null;
   onSelectLeg?: (idx: number) => void;
   onRerouteFromStop?: (stop: { stop_id: string; stop_name: string; lat?: number; lon?: number }) => void;
+  onOpenSafetyFeedback?: (journey: Journey) => void;
 }
 
 export const RouteCard: React.FC<RouteCardProps> = ({
@@ -76,6 +78,7 @@ export const RouteCard: React.FC<RouteCardProps> = ({
   activeLegIndex = null,
   onSelectLeg,
   onRerouteFromStop,
+  onOpenSafetyFeedback,
 }) => {
   const [expanded, setExpanded] = useState(index === 0);
   const [justSaved, setJustSaved] = useState(false);
@@ -312,6 +315,12 @@ export const RouteCard: React.FC<RouteCardProps> = ({
           )}
         </div>
       </div>
+
+      {/* HerRoute Community Women's Safety Insights */}
+      <CommunitySafetyCard
+        journey={journey}
+        onOpenFeedback={() => onOpenSafetyFeedback?.(journey)}
+      />
 
       {/* Detailed Leg Timeline (Collapsible) */}
       {expanded && (
