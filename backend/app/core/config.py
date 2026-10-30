@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     # Transit data settings
     GTFS_DATA_DIR: str = "data/raw/mdb-1262"
     DEFAULT_SOURCE_ID: str = "mdb-1262"
-    MAX_LOADED_TRIPS: Optional[int] = None  # None loads the full DTC network (78,507 trips)
+    MAX_LOADED_TRIPS: Optional[int] = 8000  # Default 8,000 trips ensures RAM remains ~350MB, safely below Render 512MB free tier limit
     WALK_TRANSFER_MAX_METERS: float = 400.0
 
     # Delhi OTD Real-Time Settings

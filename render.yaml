@@ -19,7 +19,7 @@ services:
       - key: CORS_ORIGINS
         value: "*"
       - key: MAX_LOADED_TRIPS
-        value: "35000" # Optimized for Render Free Tier (512MB RAM) memory budget
+        value: "8000" # Optimized for Render Free Tier (512MB RAM) memory budget
       - key: OTD_REALTIME_ENABLED
         value: "true"
       - key: OTD_REALTIME_API_KEY
