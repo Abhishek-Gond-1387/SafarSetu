@@ -168,6 +168,25 @@ export const RouteCard: React.FC<RouteCardProps> = ({
         </div>
 
         <div className="route-badges">
+          {journey.has_live_tracking && (
+            <span
+              className="badge"
+              style={{
+                backgroundColor: 'rgba(34, 197, 94, 0.12)',
+                color: '#16a34a',
+                border: '1px solid rgba(34, 197, 94, 0.35)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontWeight: 600,
+                fontSize: '0.72rem',
+              }}
+              title="Real-time bus GPS signal currently active from Delhi OTD"
+            >
+              <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', backgroundColor: '#22c55e', animation: 'pulse 1.5s infinite' }} />
+              Live Tracked
+            </span>
+          )}
           {isSelected && (
             <span
               className="badge badge-map-selected"

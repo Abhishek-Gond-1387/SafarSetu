@@ -89,6 +89,25 @@ def test_invalid_audience_rejected():
     assert "Invalid token audience" in response.json()["detail"]
 
 
+def test_es256_supabase_token_accepted():
+    """Verify ES256 Supabase token format is accepted without 'alg value is not allowed'."""
+    import base64
+    import json
+    h = base64.urlsafe_b64encode(b'{"alg":"ES256","typ":"JWT"}').decode().rstrip('=')
+    p = base64.urlsafe_b64encode(json.dumps({
+        "sub": str(TEST_USER_A_ID),
+        "email": "user@example.com",
+        "aud": "authenticated",
+        "role": "authenticated",
+        "exp": int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp())
+    }).encode()).decode().rstrip('=')
+    es256_mock_token = f"{h}.{p}.mock_signature"
+
+    response = client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {es256_mock_token}"})
+    assert response.status_code == 200
+    assert response.json()["profile"]["id"] == str(TEST_USER_A_ID)
+
+
 # ─── Profile and Preferences CRUD Tests ───────────────────────────────────────
 
 def test_user_profile_and_preferences_lifecycle():

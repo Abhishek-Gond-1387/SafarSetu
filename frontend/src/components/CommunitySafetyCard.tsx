@@ -34,10 +34,10 @@ export const CommunitySafetyCard: React.FC<CommunitySafetyCardProps> = ({
   const [insights, setInsights] = useState<RouteSafetyInsightsResponse | null>(null);
   const [expandedSegments, setExpandedSegments] = useState(false);
 
-  // Derive route ID and segments
+  // Derive route ID and segments (prioritizing canonical corridor ID for community aggregation)
   const originStopId = journey.legs?.[0]?.from_stop_id || 'origin';
   const destStopId = journey.legs?.[journey.legs.length - 1]?.to_stop_id || 'destination';
-  const routeId = `route_${originStopId}_${destStopId}`;
+  const routeId = journey.canonical_route_id || journey.journey_id || `route_${originStopId}_${destStopId}`;
 
   const segmentIds = journey.legs
     ? journey.legs.map((l) => l.from_stop_id).filter(Boolean) as string[]

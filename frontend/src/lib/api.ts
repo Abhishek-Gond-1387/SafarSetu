@@ -106,6 +106,8 @@ export interface JourneyLeg {
   source_id?: string;
   path_coordinates?: [number, number][];
   stops_detail?: LegStopDetail[];
+  has_live_vehicle?: boolean;
+  live_vehicle_count?: number;
 }
 
 export interface MetroLineStatus {
@@ -134,6 +136,9 @@ export interface MetroNetworkStatusResponse {
 }
 
 export interface Journey {
+  journey_id?: string;
+  canonical_route_id?: string;
+  has_live_tracking?: boolean;
   departure_time: string;
   arrival_time: string;
   total_duration_minutes: number;

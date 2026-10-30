@@ -1,5 +1,6 @@
 """Voice Assistant API Endpoints for Multilingual Navigation & Conversational Journey Support."""
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from app.core.rate_limit import rate_limit_voice
 from app.schemas.voice import (
     VoiceQueryRequest,
     VoiceQueryResponse,
@@ -11,7 +12,7 @@ from app.services.voice_assistant import MultilingualVoiceAssistant
 router = APIRouter()
 
 
-@router.post("/interact", response_model=VoiceQueryResponse, summary="Process Multilingual Voice/Text Query")
+@router.post("/interact", response_model=VoiceQueryResponse, dependencies=[Depends(rate_limit_voice)], summary="Process Multilingual Voice/Text Query")
 def interact(request: VoiceQueryRequest):
     """Process natural speech transcripts or typed queries in English, Hindi, and Hinglish.
     Extracts transit intents, landmarks, criteria, executes timetable-aware routing,

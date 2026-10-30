@@ -101,9 +101,14 @@ class JourneyLegOut(BaseModel):
     source_id: str = ""
     path_coordinates: List[List[float]] = Field(default_factory=list)
     stops_detail: List[LegStopDetail] = Field(default_factory=list)
+    has_live_vehicle: bool = False
+    live_vehicle_count: int = 0
 
 
 class JourneyOut(BaseModel):
+    journey_id: Optional[str] = None
+    canonical_route_id: Optional[str] = None
+    has_live_tracking: bool = False
     departure_time: str
     arrival_time: str
     total_duration_minutes: float

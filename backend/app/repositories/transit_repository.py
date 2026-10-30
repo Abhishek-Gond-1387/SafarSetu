@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from app.models.transit import GTFSDataset, Route, Stop, StopTime, Trip
 from app.utils.geo import bbox_for_radius, haversine_meters
@@ -179,6 +179,7 @@ class TransitRepository:
         lon: float,
         radius_meters: float,
         limit: int = 50,
+        filter_fn: Optional[Callable[[Stop], bool]] = None,
     ) -> List[Tuple[Stop, float]]:
         """Find stops within radius_meters using bounding box pre-filter + Haversine.
         
@@ -191,6 +192,8 @@ class TransitRepository:
         candidates: List[Tuple[Stop, float]] = []
 
         for stop in self._stops_by_id.values():
+            if filter_fn is not None and not filter_fn(stop):
+                continue
             if min_lat <= stop.stop_lat <= max_lat and min_lon <= stop.stop_lon <= max_lon:
                 dist = haversine_meters(lat, lon, stop.stop_lat, stop.stop_lon)
                 if dist <= radius_meters:

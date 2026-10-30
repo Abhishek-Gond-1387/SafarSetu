@@ -1,9 +1,10 @@
 """Routes planning and comparison API endpoints."""
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
+from app.core.rate_limit import rate_limit_plan
 
-from app.models.journey import RouteRankCriterion
+from app.models.journey import LegMode, RouteRankCriterion
 from app.models.transit import StopTime
 from app.schemas.routing import (
     JourneyLegOut,
@@ -27,8 +28,8 @@ from app.utils.geo import haversine_meters
 router = APIRouter()
 
 
-@router.post("/plan", response_model=RoutePlanResponse, summary="Plan Transit Journey")
-def plan_route(request: RoutePlanRequest):
+@router.post("/plan", response_model=RoutePlanResponse, dependencies=[Depends(rate_limit_plan)], summary="Plan Transit Journey")
+def plan_route(req: RoutePlanRequest = Body(...)):
     """Plan feasible journeys between genuine transit stops using the timetable-aware engine."""
     ctx = get_transit_context()
     if not ctx.router:
@@ -38,40 +39,40 @@ def plan_route(request: RoutePlanRequest):
         )
 
     # Parse requested departure time to seconds since midnight
-    dep_seconds = StopTime.parse_time(request.departure_time)
+    dep_seconds = StopTime.parse_time(req.departure_time)
     if dep_seconds is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Invalid departure time format: '{request.departure_time}'. Expected HH:MM or HH:MM:SS.",
+            detail=f"Invalid departure time format: '{req.departure_time}'. Expected HH:MM or HH:MM:SS.",
         )
 
-    if request.origin_stop_id == request.destination_stop_id:
+    if req.origin_stop_id == req.destination_stop_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Origin and destination stops are identical.",
         )
 
-    if ctx.dataset and request.origin_stop_id not in ctx.dataset.stops:
+    if ctx.dataset and req.origin_stop_id not in ctx.dataset.stops:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Origin stop '{request.origin_stop_id}' does not exist in dataset.",
+            detail=f"Origin stop '{req.origin_stop_id}' does not exist in dataset.",
         )
 
-    if ctx.dataset and request.destination_stop_id not in ctx.dataset.stops:
+    if ctx.dataset and req.destination_stop_id not in ctx.dataset.stops:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Destination stop '{request.destination_stop_id}' does not exist in dataset.",
+            detail=f"Destination stop '{req.destination_stop_id}' does not exist in dataset.",
         )
 
-    criterion = RouteRankCriterion(request.criterion)
+    criterion = RouteRankCriterion(req.criterion)
     raw_journeys, no_route_reason = ctx.router.plan_journey(
-        origin_stop_id=request.origin_stop_id,
-        destination_stop_id=request.destination_stop_id,
-        departure_date=request.departure_date,
+        origin_stop_id=req.origin_stop_id,
+        destination_stop_id=req.destination_stop_id,
+        departure_date=req.departure_date,
         departure_seconds=dep_seconds,
-        max_transfers=request.max_transfers,
+        max_transfers=req.max_transfers,
         criterion=criterion,
-        mode_filter=request.mode_preference or "all",
+        mode_filter=req.mode_preference or "all",
     )
 
     ranked_journeys = RouteRanker.rank(raw_journeys, criterion=criterion)
@@ -126,6 +127,15 @@ def plan_route(request: RoutePlanRequest):
                     "mode": leg.mode.value,
                 })
 
+            # Check live vehicle tracking for this leg from OTD realtime feed
+            live_vehicles_on_route = []
+            if ctx.realtime_repo and leg.route_id:
+                try:
+                    records, _, _ = ctx.realtime_repo.get_vehicles(route_id=leg.route_id, limit=5)
+                    live_vehicles_on_route = records
+                except Exception:
+                    live_vehicles_on_route = []
+
             legs_out.append(
                 JourneyLegOut(
                     mode=leg.mode.value,
@@ -151,11 +161,28 @@ def plan_route(request: RoutePlanRequest):
                     source_id=leg.source_id,
                     path_coordinates=path_coords,
                     stops_detail=stops_detail,
+                    has_live_vehicle=len(live_vehicles_on_route) > 0,
+                    live_vehicle_count=len(live_vehicles_on_route),
                 )
             )
 
+        transit_identifiers = [
+            (leg.route_short_name or leg.route_id or "transit").replace(" ", "_")
+            for leg in rj.legs if leg.mode != LegMode.WALK and (leg.route_short_name or leg.route_id)
+        ]
+        if transit_identifiers:
+            canonical_id = "corridor_" + "_".join(transit_identifiers)
+        else:
+            canonical_id = f"corridor_walk_{rj.legs[0].from_stop_id if rj.legs else 'start'}_{rj.legs[-1].to_stop_id if rj.legs else 'end'}"
+
+        journey_id_hash = f"journey_{canonical_id}_{rj.departure_time_str}_{rj.arrival_time_str}"
+        any_live_tracking = any(l.has_live_vehicle for l in legs_out)
+
         journeys_out.append(
             JourneyOut(
+                journey_id=journey_id_hash,
+                canonical_route_id=canonical_id,
+                has_live_tracking=any_live_tracking,
                 departure_time=rj.departure_time_str,
                 arrival_time=rj.arrival_time_str,
                 total_duration_minutes=round(rj.total_duration_seconds / 60.0, 1),
@@ -176,11 +203,11 @@ def plan_route(request: RoutePlanRequest):
     freshness_warnings = []
     cal_note = None
     if ctx.dataset and ctx.dataset.feed_info and ctx.dataset.feed_info.feed_end_date:
-        if ctx.dataset.feed_info.feed_end_date < request.departure_date:
+        if ctx.dataset.feed_info.feed_end_date < req.departure_date:
             freshness_warnings.append(
                 f"Dataset {ctx.dataset.source_id} calendar expired on "
                 f"{ctx.dataset.feed_info.feed_end_date.isoformat()}. "
-                f"Requested journey date is {request.departure_date.isoformat()}. "
+                f"Requested journey date is {req.departure_date.isoformat()}. "
                 "Results reflect historical schedule timetables."
             )
             cal_note = (
@@ -192,11 +219,11 @@ def plan_route(request: RoutePlanRequest):
             cal_note = f"Service calendar valid through {ctx.dataset.feed_info.feed_end_date.isoformat()}."
 
     return RoutePlanResponse(
-        origin_stop_id=request.origin_stop_id,
-        destination_stop_id=request.destination_stop_id,
-        departure_date=request.departure_date.isoformat(),
-        requested_time=request.departure_time,
-        criterion=request.criterion,
+        origin_stop_id=req.origin_stop_id,
+        destination_stop_id=req.destination_stop_id,
+        departure_date=req.departure_date.isoformat(),
+        requested_time=req.departure_time,
+        criterion=req.criterion,
         journeys=journeys_out,
         data_freshness_warnings=freshness_warnings,
         calendar_validity_note=cal_note,
@@ -449,31 +476,52 @@ def lost_assistance(req: LostAssistanceRequest):
             detail="Transit repository is not initialized.",
         )
 
-    # 1. Search for nearby transit within 4 km, expanding to 10 km if needed
-    nearby = ctx.repository.find_nearby_stops(req.user_lat, req.user_lon, radius_meters=4000.0, limit=40)
-    if not nearby:
-        nearby = ctx.repository.find_nearby_stops(req.user_lat, req.user_lon, radius_meters=10000.0, limit=40)
+    # 1. Specifically search for nearest bus stops (up to 4km, expanding to 10km)
+    bus_nearby = ctx.repository.find_nearby_stops(
+        req.user_lat, req.user_lon, radius_meters=4000.0, limit=20,
+        filter_fn=lambda s: not s.stop_id.startswith("metro_")
+    )
+    if not bus_nearby:
+        bus_nearby = ctx.repository.find_nearby_stops(
+            req.user_lat, req.user_lon, radius_meters=10000.0, limit=20,
+            filter_fn=lambda s: not s.stop_id.startswith("metro_")
+        )
 
-    # Fallback to Rajiv Chowk if coordinates are completely outside or unmapped
-    if not nearby:
+    # 2. Specifically search for nearest Metro stations (up to 8km, expanding to 25km)
+    metro_nearby = ctx.repository.find_nearby_stops(
+        req.user_lat, req.user_lon, radius_meters=8000.0, limit=10,
+        filter_fn=lambda s: s.stop_id.startswith("metro_")
+    )
+    if not metro_nearby:
+        metro_nearby = ctx.repository.find_nearby_stops(
+            req.user_lat, req.user_lon, radius_meters=25000.0, limit=10,
+            filter_fn=lambda s: s.stop_id.startswith("metro_")
+        )
+
+    nearest_bus_pair = bus_nearby[0] if bus_nearby else None
+    nearest_metro_pair = metro_nearby[0] if metro_nearby else None
+
+    # Overall nearest
+    all_candidates = []
+    if nearest_bus_pair:
+        all_candidates.append(nearest_bus_pair)
+    if nearest_metro_pair:
+        all_candidates.append(nearest_metro_pair)
+
+    if not all_candidates:
         default_stop = ctx.repository.get_stop("metro_122") or (
             list(ctx.dataset.stops.values())[0] if ctx.dataset and ctx.dataset.stops else None
         )
         if default_stop:
-            nearby = [(default_stop, 1200.0)]
+            all_candidates = [(default_stop, 1200.0)]
         else:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No transit stops found near the provided location.",
             )
 
-    # 2. Categorize nearest metro, nearest bus stop, and nearest overall
-    metro_candidates = [pair for pair in nearby if pair[0].stop_id.startswith("metro_")]
-    bus_candidates = [pair for pair in nearby if not pair[0].stop_id.startswith("metro_")]
-
-    nearest_metro_pair = metro_candidates[0] if metro_candidates else None
-    nearest_bus_pair = bus_candidates[0] if bus_candidates else None
-    overall_pair = nearby[0]
+    all_candidates.sort(key=lambda x: x[1])
+    overall_pair = all_candidates[0]
 
     def _build_detail(stop, dist_m: float, st_type: str) -> NearestStationDetail:
         walk_mins = max(1.0, round(dist_m / 80.0, 1))
@@ -521,17 +569,23 @@ def lost_assistance(req: LostAssistanceRequest):
     overall_type = "metro" if overall_pair[0].stop_id.startswith("metro_") else "bus"
     nearest_overall_detail = _build_detail(overall_pair[0], overall_pair[1], overall_type)
 
-    # Auto rickshaw fare estimate from location to closest metro or major hub
+    # Auto rickshaw fare estimate from location to closest metro or major hub (GNCTD Meter Slabs)
     auto_dist_km = (
         round(nearest_metro_pair[1] / 1000.0, 1)
         if nearest_metro_pair
         else round(overall_pair[1] / 1000.0, 1)
     )
     auto_fare = 30.0 if auto_dist_km <= 1.5 else round(30.0 + (auto_dist_km - 1.5) * 11.0)
-    auto_pickup = (
-        f"Official GNCTD Auto-Rickshaw Stand available at {nearest_overall_detail.stop_name} "
-        f"or flag any passing green-yellow auto."
-    )
+    if nearest_metro_detail:
+        auto_pickup = (
+            f"Dedicated DMRC Feeder Auto/E-Rickshaw stand at {nearest_metro_detail.stop_name} (Gate area). "
+            f"Standard GNCTD meter fare to this station is ~₹{auto_fare}."
+        )
+    else:
+        auto_pickup = (
+            f"GNCTD Auto-Rickshaw pickup point available near {nearest_overall_detail.stop_name}. "
+            f"Estimated meter fare is ~₹{auto_fare}."
+        )
 
     # 3. Reroute / Map Journey to Destination if provided
     dest_id = req.destination_stop_id
