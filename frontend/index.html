@@ -2,17 +2,42 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover"
+    />
     <title>SafarSetu — Delhi NCR Public Transit Assistant</title>
     <meta
       name="description"
-      content="Delhi & NCR multimodal public transit journey planner powered by genuine DTC/DIMTS GTFS schedules and OTD real-time telemetry."
+      content="Delhi & NCR multimodal public transit journey planner powered by genuine DTC/DIMTS GTFS schedules and DMRC metro telemetry."
     />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f766e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M8 6v6'/><path d='M15 6v6'/><path d='M2 12h19.6'/><path d='M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4C2.9 6 1.9 6.8 1.6 7.8l-1.4 5c-.1.4-.2.8-.2 1.2 0 .4.1.8.2 1.2.3 1.1.8 2.8.8 2.8h3'/><circle cx='7' cy='18' r='2'/><circle cx='17' cy='18' r='2'/></svg>" />
+
+    <!-- Progressive Web App (PWA) Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Favicon & Touch Icons -->
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
+    <!-- Color Theme for Browsers, Windows & Mobile Status Bars -->
+    <meta name="theme-color" content="#0284c7" />
+    <meta name="msapplication-navbutton-color" content="#0284c7" />
+    <meta name="msapplication-TileColor" content="#0284c7" />
+    <meta name="msapplication-TileImage" content="/icon-192.png" />
+
+    <!-- iOS Safari Standalone Web App Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SafarSetu" />
+
+    <!-- Android / Chrome / Edge App Tags -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="SafarSetu" />
+    <meta name="format-detection" content="telephone=no" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

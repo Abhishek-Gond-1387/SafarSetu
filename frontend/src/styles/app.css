@@ -5724,3 +5724,231 @@ input, select, textarea {
     justify-content: center !important;
   }
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   PROGRESSIVE WEB APP (PWA) STYLES
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.drawer-install-app-btn {
+  background: linear-gradient(135deg, #f0fdfa 0%, #e0f2fe 100%) !important;
+  border: 1.5px solid #bae6fd !important;
+  color: #0369a1 !important;
+  font-weight: 750 !important;
+  border-radius: 10px !important;
+  margin-top: 0.4rem !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.drawer-install-app-btn:hover {
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%) !important;
+  color: #075985 !important;
+  border-color: #38bdf8 !important;
+  transform: translateX(3px) !important;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.18) !important;
+}
+
+.pwa-install-badge {
+  background: #0284c7 !important;
+  color: #ffffff !important;
+  font-size: 0.65rem !important;
+  font-weight: 850 !important;
+  padding: 0.15rem 0.45rem !important;
+  border-radius: 9999px !important;
+  letter-spacing: 0.04em !important;
+  margin-left: auto !important;
+}
+
+.drawer-app-installed-badge {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  padding: 0.6rem 0.85rem !important;
+  background: #f0fdf4 !important;
+  border: 1px solid #bbf7d0 !important;
+  border-radius: 10px !important;
+  color: #166534 !important;
+  font-size: 0.78rem !important;
+  font-weight: 650 !important;
+  margin-top: 0.4rem !important;
+}
+/* ══════════════════════════════════════════════════════════════════════════
+   NAVBAR PWA INSTALL PROMPT & CROSS BUTTON
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Pill in Top Navbar Actions */
+.nav-install-pill-box {
+  display: inline-flex !important;
+  align-items: center !important;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35) !important;
+  overflow: hidden !important;
+  animation: pulse-pwa-install 2.6s infinite !important;
+}
+
+@keyframes pulse-pwa-install {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(2, 132, 199, 0);
+  }
+}
+
+.nav-install-pill-btn {
+  background: transparent !important;
+  border: none !important;
+  color: #ffffff !important;
+  padding: 0.4rem 0.65rem !important;
+  font-size: 0.8rem !important;
+  font-weight: 750 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  cursor: pointer !important;
+  transition: opacity 0.15s ease !important;
+}
+
+.nav-install-pill-btn:hover {
+  opacity: 0.9 !important;
+}
+
+.nav-install-pill-close {
+  background: rgba(0, 0, 0, 0.18) !important;
+  border: none !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.25) !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+  padding: 0.4rem 0.5rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.nav-install-pill-close:hover {
+  background: rgba(0, 0, 0, 0.35) !important;
+  color: #ffffff !important;
+}
+
+/* Slim Prompt Banner on Navbar */
+.nav-pwa-banner-strip {
+  background: linear-gradient(90deg, #0f172a 0%, #0369a1 50%, #0f766e 100%) !important;
+  color: #ffffff !important;
+  padding: 0.42rem 1.25rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-bottom: 1.5px solid #0284c7 !important;
+  animation: fadeInBanner 0.25s ease-out !important;
+}
+
+@keyframes fadeInBanner {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.nav-pwa-banner-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.65rem !important;
+  cursor: pointer !important;
+  min-width: 0 !important;
+  flex: 1 !important;
+}
+
+.nav-pwa-banner-icon {
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 7px !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+.nav-pwa-banner-msg {
+  font-size: 0.8rem !important;
+  line-height: 1.3 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.pwa-bold-txt {
+  font-weight: 800 !important;
+  color: #ffffff !important;
+}
+
+.pwa-info-txt {
+  color: #e0f2fe !important;
+}
+
+.nav-pwa-banner-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  flex-shrink: 0 !important;
+  margin-left: 0.75rem !important;
+}
+
+.nav-pwa-banner-install-btn {
+  background: #ffffff !important;
+  color: #0369a1 !important;
+  border: none !important;
+  border-radius: 6px !important;
+  padding: 0.28rem 0.75rem !important;
+  font-size: 0.76rem !important;
+  font-weight: 850 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  white-space: nowrap !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+}
+
+.nav-pwa-banner-install-btn:hover {
+  background: #f0f9ff !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2) !important;
+}
+
+.nav-pwa-banner-close-btn {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+  border-radius: 6px !important;
+  width: 26px !important;
+  height: 26px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.nav-pwa-banner-close-btn:hover {
+  background: rgba(255, 255, 255, 0.32) !important;
+  transform: scale(1.06) !important;
+}
+
+/* Mobile Responsiveness for PWA Navbar Strip */
+@media (max-width: 640px) {
+  .nav-pwa-banner-strip {
+    padding: 0.38rem 0.85rem !important;
+  }
+
+  .pwa-info-txt {
+    display: none !important;
+  }
+
+  .nav-pwa-banner-msg {
+    font-size: 0.76rem !important;
+  }
+
+  .nav-pwa-banner-install-btn {
+    padding: 0.25rem 0.55rem !important;
+    font-size: 0.72rem !important;
+  }
+}

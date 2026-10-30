@@ -1,0 +1,66 @@
+{
+  "id": "safarsetu-delhi-transit-app",
+  "name": "SafarSetu - Delhi Transit & Navigation",
+  "short_name": "SafarSetu",
+  "description": "AI-powered multimodal transportation & tourism navigation for Delhi NCR (Metro, DTC Buses, Auto-Rickshaw & Walking).",
+  "lang": "en-IN",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#0284c7",
+  "categories": ["travel", "navigation", "transportation"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Journey Planner",
+      "short_name": "Planner",
+      "description": "Plan multimodal transit journeys across Delhi NCR",
+      "url": "/planner",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "I Am Lost (SOS Reroute)",
+      "short_name": "I'm Lost",
+      "description": "Emergency redirection to nearest Metro or Bus stand",
+      "url": "/?action=lost",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Delhi Metro Status",
+      "short_name": "Metro Status",
+      "description": "Live DMRC metro network status and line headways",
+      "url": "/?action=metro",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
+

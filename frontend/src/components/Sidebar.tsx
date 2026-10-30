@@ -15,7 +15,12 @@ import {
   Menu,
   X,
   Navigation,
+  Download,
+  Smartphone,
+  CheckCircle2,
 } from 'lucide-react';
+import { usePWAState, promptPWAInstall, PWAState } from '../pwa';
+import { IOSInstallModal } from './IOSInstallModal';
 import { UserSession } from '../lib/supabase';
 import { RealtimeStatusResponse } from '../lib/api';
 
@@ -47,6 +52,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenLost,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [pwaState, setPwaState] = useState<PWAState>({
+    isInstallable: false,
+    isInstalled: false,
+    isIOS: false,
+    isOffline: false,
+  });
+  const [showIOSModal, setShowIOSModal] = useState(false);
+  const [isPromptDismissed, setIsPromptDismissed] = useState(false);
+
+  useEffect(() => {
+    const unsub = usePWAState((state) => setPwaState(state));
+    return unsub;
+  }, []);
+
+  const handleInstallClick = async () => {
+    const result = await promptPWAInstall();
+    if (result === 'ios') {
+      setShowIOSModal(true);
+    } else if (result === 'unsupported' && !pwaState.isInstalled) {
+      alert(
+        'To install SafarSetu on this browser, open your browser menu (⋮ or ...) and select "Install SafarSetu" or "Add to Home Screen".'
+      );
+    }
+  };
 
   // Close drawer on Escape key press
   useEffect(() => {
@@ -174,6 +203,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             )}
 
+            {/* PWA Install Prompt on Navbar with Cross Button */}
+            {!pwaState.isInstalled && !isPromptDismissed && (
+              <div className="nav-install-pill-box">
+                <button
+                  type="button"
+                  className="nav-install-pill-btn"
+                  onClick={handleInstallClick}
+                  title="Download and install SafarSetu on your device as a native app"
+                >
+                  <Download size={14} />
+                  <span className="pill-text-desktop">Install App</span>
+                  <span className="pill-text-mobile">App</span>
+                </button>
+                <button
+                  type="button"
+                  className="nav-install-pill-close"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsPromptDismissed(true);
+                  }}
+                  title="Dismiss install prompt"
+                  aria-label="Dismiss install prompt"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            )}
+
             {/* Multilingual Voice AI Trigger */}
             {onOpenVoice && (
               <button
@@ -211,6 +268,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
         </div>
+
+        {/* PWA Install Prompt Banner on Navbar with Cross Button */}
+        {!pwaState.isInstalled && !isPromptDismissed && (
+          <div className="nav-pwa-banner-strip">
+            <div className="nav-pwa-banner-left" onClick={handleInstallClick} role="button" tabIndex={0}>
+              <div className="nav-pwa-banner-icon">
+                <Download size={14} />
+              </div>
+              <div className="nav-pwa-banner-msg">
+                <span className="pwa-bold-txt">Install SafarSetu App:</span>
+                <span className="pwa-info-txt"> One-tap access, offline transit routes &amp; live metro updates.</span>
+              </div>
+            </div>
+
+            <div className="nav-pwa-banner-right">
+              <button
+                type="button"
+                className="nav-pwa-banner-install-btn"
+                onClick={handleInstallClick}
+              >
+                Install Now
+              </button>
+              <button
+                type="button"
+                className="nav-pwa-banner-close-btn"
+                onClick={() => setIsPromptDismissed(true)}
+                title="Dismiss install prompt"
+                aria-label="Dismiss install prompt"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* ── Slide-Out Drawer Backdrop ── */}
@@ -371,6 +462,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <MessageSquare size={18} />
               <span>Commuter Feedback</span>
             </button>
+
+            {/* Install SafarSetu PWA App Button */}
+            {!pwaState.isInstalled ? (
+              <button
+                type="button"
+                className="drawer-nav-item drawer-install-app-btn"
+                onClick={handleInstallClick}
+                title="Download and install SafarSetu on your device as a native app"
+              >
+                <Download size={18} />
+                <span>Install SafarSetu App</span>
+                <span className="pwa-install-badge">INSTALL</span>
+              </button>
+            ) : (
+              <div className="drawer-app-installed-badge">
+                <CheckCircle2 size={16} color="#10b981" />
+                <span>SafarSetu App Installed</span>
+              </div>
+            )}
           </nav>
         </div>
 
@@ -436,6 +546,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
       </aside>
+      <IOSInstallModal isOpen={showIOSModal} onClose={() => setShowIOSModal(false)} />
     </>
   );
 };
