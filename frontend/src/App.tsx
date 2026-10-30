@@ -77,6 +77,10 @@ const PlannerPage: React.FC<{
   onCloseMetro: () => void;
   onSignOut: () => void;
   onOpenAccount: () => void;
+  emergencyRerouteInfo: { stop_name: string; original_origin: string } | null;
+  onDismissEmergency: () => void;
+  onRerouteFromStop: (stop: { stop_id: string; stop_name: string; lat?: number; lon?: number }) => void;
+  onRerouteFromGPS: () => void;
 }> = ({
   session,
   health,
@@ -103,6 +107,10 @@ const PlannerPage: React.FC<{
   onCloseMetro,
   onSignOut,
   onOpenAccount,
+  emergencyRerouteInfo,
+  onDismissEmergency,
+  onRerouteFromStop,
+  onRerouteFromGPS,
 }) => {
   const [searchMode, setSearchMode] = useState<'explorer' | 'standard'>('explorer');
   const [selectedJourneyIndex, setSelectedJourneyIndex] = useState<number>(0);
@@ -198,6 +206,39 @@ const PlannerPage: React.FC<{
               </div>
             )}
 
+            {/* Emergency Re-route Notice */}
+            {emergencyRerouteInfo && (
+              <div className="alert-box alert-danger" style={{ marginTop: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fef2f2', border: '1.5px solid #fecaca' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <span style={{ fontSize: '1.25rem' }}>🚨</span>
+                  <div>
+                    <strong style={{ fontSize: '0.92rem', color: '#991b1b', display: 'block' }}>
+                      Emergency Re-route Active
+                    </strong>
+                    <span style={{ fontSize: '0.8rem', color: '#7f1d1d' }}>
+                      Transport cancelled at <strong>{emergencyRerouteInfo.stop_name}</strong>. Showing fail-safe alternative Metro, Bus &amp; Cab routes to your destination.
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={onDismissEmergency}
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #fca5a5',
+                    color: '#991b1b',
+                    padding: '0.3rem 0.65rem',
+                    borderRadius: '4px',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
             {/* Results Display with Side Map */}
             {routePlan && routePlan.journeys.length > 0 ? (
               <div className="results-layout-with-map" style={{ marginTop: '1.5rem' }}>
@@ -239,6 +280,7 @@ const PlannerPage: React.FC<{
                         setSelectedJourneyIndex(idx);
                         setSelectedLegIndex(legIdx);
                       }}
+                      onRerouteFromStop={onRerouteFromStop}
                     />
                   ))}
                 </div>
@@ -259,6 +301,8 @@ const PlannerPage: React.FC<{
                       journey={routePlan.journeys[selectedJourneyIndex] || null}
                       activeLegIndex={selectedLegIndex}
                       onSelectLeg={(legIdx) => setSelectedLegIndex(legIdx)}
+                      onRerouteFromStop={onRerouteFromStop}
+                      onRerouteFromGPS={onRerouteFromGPS}
                     />
                   </div>
                 </div>
@@ -368,6 +412,7 @@ const PlannerPage: React.FC<{
                           setSelectedJourneyIndex(idx);
                           setSelectedLegIndex(legIdx);
                         }}
+                        onRerouteFromStop={onRerouteFromStop}
                       />
                     ))}
                   </div>
@@ -387,6 +432,8 @@ const PlannerPage: React.FC<{
                         journey={routePlan.journeys[selectedJourneyIndex] || null}
                         activeLegIndex={selectedLegIndex}
                         onSelectLeg={(legIdx) => setSelectedLegIndex(legIdx)}
+                        onRerouteFromStop={onRerouteFromStop}
+                        onRerouteFromGPS={onRerouteFromGPS}
                       />
                     </div>
                   </div>
@@ -451,6 +498,8 @@ export const App: React.FC = () => {
   const [isPlanning, setIsPlanning] = useState(false);
   const [routePlan, setRoutePlan] = useState<RoutePlanResponse | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
+  const [lastPlanParams, setLastPlanParams] = useState<PlanRouteParams | null>(null);
+  const [emergencyRerouteInfo, setEmergencyRerouteInfo] = useState<{ stop_name: string; original_origin: string } | null>(null);
 
   // Prefill state from Saved Journeys
   const [selectedOrigin, setSelectedOrigin] = useState<StopItem | null>(null);
@@ -502,6 +551,7 @@ export const App: React.FC = () => {
     setIsPlanning(true);
     setPlanError(null);
     setRoutePlan(null);
+    setLastPlanParams(params);
 
     try {
       const res = await SafarSetuAPI.planRoute(params);
@@ -514,6 +564,63 @@ export const App: React.FC = () => {
     } finally {
       setIsPlanning(false);
     }
+  };
+
+  const handleRerouteFromStop = async (stop: { stop_id: string; stop_name: string; lat?: number; lon?: number }) => {
+    const destId = lastPlanParams?.destination_stop_id || routePlan?.destination_stop_id;
+    if (!destId) {
+      alert('Destination not set. Please search for a destination first.');
+      return;
+    }
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`;
+    const todayStr = now.toISOString().split('T')[0];
+
+    setEmergencyRerouteInfo({
+      stop_name: stop.stop_name,
+      original_origin: routePlan?.journeys?.[0]?.legs?.[0]?.from_stop_name || 'Original Station',
+    });
+
+    handlePlanRoute({
+      origin_stop_id: stop.stop_id,
+      destination_stop_id: destId,
+      departure_date: todayStr,
+      departure_time: timeStr,
+      criterion: 'fastest',
+      mode_preference: 'all',
+      max_transfers: 3,
+      max_walk_meters: 1000,
+    });
+  };
+
+  const handleRerouteFromGPS = async () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const res = await SafarSetuAPI.getNearbyStops(pos.coords.latitude, pos.coords.longitude, 3500, 5);
+          if (res.results && res.results.length > 0) {
+            const closest = res.results[0];
+            handleRerouteFromStop({
+              stop_id: closest.stop_id,
+              stop_name: closest.stop_name,
+              lat: closest.stop_lat,
+              lon: closest.stop_lon,
+            });
+          } else {
+            alert('No verified Delhi transit stops found within 3.5 km of your GPS location.');
+          }
+        } catch (err) {
+          console.error('GPS reroute error:', err);
+        }
+      },
+      (err) => {
+        alert(`Location access denied or unavailable (${err.message}). Click on any station on the map instead.`);
+      }
+    );
   };
 
   const handleSaveJourney = async (journey: Journey) => {
@@ -608,6 +715,10 @@ export const App: React.FC = () => {
               onCloseMetro={() => setMetroOpen(false)}
               onSignOut={handleSignOut}
               onOpenAccount={() => navigate('/account')}
+              emergencyRerouteInfo={emergencyRerouteInfo}
+              onDismissEmergency={() => setEmergencyRerouteInfo(null)}
+              onRerouteFromStop={handleRerouteFromStop}
+              onRerouteFromGPS={handleRerouteFromGPS}
             />
           </ProtectedRoute>
         }

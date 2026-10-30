@@ -83,6 +83,7 @@ flowchart TD
         F["Customize Stops & Prioritize (Fastest | Cheapest | Balanced)"]
         G["Split Results & Live Map (Synchronized Route Cards + Mapbox Polyline)"]
         H["Optional: Real-Time Live Bus Fleet Layer (VehiclePositions.pb)"]
+        Q["Mid-Transit Cancellation / Breakdown Handler (Re-Route From Any Stop)"]
     end
 
     subgraph Backend ["2. SafarSetu Engine (FastAPI + In-Memory Graph Router)"]
@@ -114,6 +115,8 @@ flowchart TD
     K --- O
     G -.-> H
     H -.-> P
+    G -.-> Q
+    Q -- "Emergency Sub-Path Re-route" --> K
 ```
 
 ---

@@ -14,6 +14,7 @@ import {
   Radio,
   ArrowRightLeft,
   MapPin,
+  AlertTriangle,
 } from 'lucide-react';
 import { Journey, JourneyLeg } from '../lib/api';
 
@@ -62,6 +63,7 @@ interface RouteCardProps {
   onSelect?: () => void;
   activeLegIndex?: number | null;
   onSelectLeg?: (idx: number) => void;
+  onRerouteFromStop?: (stop: { stop_id: string; stop_name: string; lat?: number; lon?: number }) => void;
 }
 
 export const RouteCard: React.FC<RouteCardProps> = ({
@@ -73,6 +75,7 @@ export const RouteCard: React.FC<RouteCardProps> = ({
   onSelect,
   activeLegIndex = null,
   onSelectLeg,
+  onRerouteFromStop,
 }) => {
   const [expanded, setExpanded] = useState(index === 0);
   const [justSaved, setJustSaved] = useState(false);
@@ -433,6 +436,47 @@ export const RouteCard: React.FC<RouteCardProps> = ({
                         </span>
                       </div>
                     </div>
+
+                    {/* Emergency Re-route Trigger if Vehicle Breaks Down or is Cancelled */}
+                    {!isWalking && onRerouteFromStop && (
+                      <div className="leg-reroute-bar" style={{ marginTop: '0.55rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff1f2', border: '1px solid #fecdd3', padding: '0.4rem 0.65rem', borderRadius: '6px' }}>
+                        <span style={{ fontSize: '0.74rem', color: '#9f1239', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                          <span>Vehicle cancelled or broke down here?</span>
+                        </span>
+                        <button
+                          type="button"
+                          className="btn-emergency-reroute"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRerouteFromStop({
+                              stop_id: leg.from_stop_id,
+                              stop_name: leg.from_stop_name,
+                              lat: leg.from_stop_lat || undefined,
+                              lon: leg.from_stop_lon || undefined,
+                            });
+                          }}
+                          title={`Find emergency alternative route from ${leg.from_stop_name}`}
+                          style={{
+                            background: '#dc2626',
+                            color: '#ffffff',
+                            border: 'none',
+                            padding: '0.25rem 0.65rem',
+                            borderRadius: '4px',
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.3rem',
+                            boxShadow: '0 1px 3px rgba(220, 38, 38, 0.3)',
+                          }}
+                        >
+                          <AlertTriangle size={11} />
+                          <span>Re-Route From {leg.from_stop_name}</span>
+                        </button>
+                      </div>
+                    )}
 
                     {/* Transfer guidance note if followed by another leg without specific line change */}
                     {!isWalking && !nextTransitLeg && legIdx < journey.legs.length - 1 && (

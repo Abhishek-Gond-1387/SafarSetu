@@ -11,6 +11,7 @@ import {
   Bus,
   Footprints,
   RotateCcw,
+  AlertTriangle,
 } from 'lucide-react';
 import { Journey, JourneyLeg, SafarSetuAPI } from '../lib/api';
 
@@ -18,6 +19,8 @@ interface RouteMapProps {
   journey: Journey | null;
   activeLegIndex?: number | null;
   onSelectLeg?: (index: number) => void;
+  onRerouteFromStop?: (stop: { stop_id: string; stop_name: string; lat?: number; lon?: number }) => void;
+  onRerouteFromGPS?: () => void;
   className?: string;
 }
 
@@ -47,6 +50,8 @@ export const RouteMap: React.FC<RouteMapProps> = ({
   journey,
   activeLegIndex = null,
   onSelectLeg,
+  onRerouteFromStop,
+  onRerouteFromGPS,
   className = '',
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -56,6 +61,28 @@ export const RouteMap: React.FC<RouteMapProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showLiveBuses, setShowLiveBuses] = useState(false);
   const [liveBusCount, setLiveBusCount] = useState<number>(0);
+
+  // Delegate click events from Leaflet popup buttons to trigger emergency re-route
+  useEffect(() => {
+    const container = mapContainerRef.current;
+    if (!container) return;
+
+    const handlePopupClick = (e: MouseEvent) => {
+      const target = (e.target as HTMLElement).closest('.leaflet-reroute-btn') as HTMLElement | null;
+      if (target && onRerouteFromStop) {
+        const stopId = target.getAttribute('data-stop-id') || '';
+        const stopName = decodeURIComponent(target.getAttribute('data-stop-name') || '');
+        const lat = parseFloat(target.getAttribute('data-lat') || '0');
+        const lon = parseFloat(target.getAttribute('data-lon') || '0');
+        if (stopId) {
+          onRerouteFromStop({ stop_id: stopId, stop_name: stopName, lat, lon });
+        }
+      }
+    };
+
+    container.addEventListener('click', handlePopupClick);
+    return () => container.removeEventListener('click', handlePopupClick);
+  }, [onRerouteFromStop]);
 
   // Initialize Leaflet Map
   useEffect(() => {
@@ -308,11 +335,26 @@ export const RouteMap: React.FC<RouteMapProps> = ({
         });
 
         marker.bindPopup(`
-          <div style="font-family: inherit; font-size: 12.5px; line-height: 1.4;">
-            <strong>${stop.stop_name}</strong><br/>
-            <span style="color: #64748b;">
-              ${isJourneyStart ? '🟢 Origin Boarding Station' : isJourneyEnd ? '🔴 Final Destination' : isInterchange ? '🔄 Transfer Interchange' : '🚆 Intermediate Station'}
-            </span>
+          <div style="font-family: inherit; font-size: 12.5px; line-height: 1.45; min-width: 190px;">
+            <div style="font-weight: 700; color: #1e293b; margin-bottom: 2px;">${stop.stop_name}</div>
+            <div style="color: #64748b; font-size: 11px; margin-bottom: 6px;">
+              ${isJourneyStart ? '🟢 Origin Boarding Station' : isJourneyEnd ? '🔴 Final Destination' : isInterchange ? '🔄 Transfer Interchange' : '🚆 Station Stop'}
+            </div>
+            ${!isJourneyEnd && onRerouteFromStop ? `
+              <div style="border-top: 1px dashed #e2e8f0; padding-top: 6px; margin-top: 4px;">
+                <button
+                  type="button"
+                  class="leaflet-reroute-btn"
+                  data-stop-id="${stop.stop_id}"
+                  data-stop-name="${encodeURIComponent(stop.stop_name)}"
+                  data-lat="${stop.lat}"
+                  data-lon="${stop.lon}"
+                  style="width: 100%; background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; border-radius: 4px; padding: 5px 8px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: all 0.15s ease;"
+                >
+                  ⚠️ Cancelled? Re-route Here
+                </button>
+              </div>
+            ` : ''}
           </div>
         `);
 
@@ -349,6 +391,29 @@ export const RouteMap: React.FC<RouteMapProps> = ({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+          {/* Emergency Stranded Re-route Button */}
+          {onRerouteFromGPS && (
+            <button
+              type="button"
+              className="map-control-btn"
+              onClick={onRerouteFromGPS}
+              title="Vehicle cancelled? Re-route from your current GPS location"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                background: '#fee2e2',
+                color: '#991b1b',
+                borderColor: '#fca5a5',
+              }}
+            >
+              <AlertTriangle size={12} color="#dc2626" />
+              <span>Stranded?</span>
+            </button>
+          )}
+
           {/* Live Buses Toggle */}
           <button
             type="button"
