@@ -1497,6 +1497,10 @@ input, select, textarea {
   padding: 1.75rem 0 4rem;
 }
 
+.app-main-planner {
+  padding-top: 2rem;
+}
+
 .planner-grid {
   display: grid;
   grid-template-columns: 380px 1fr;
@@ -3047,14 +3051,16 @@ input, select, textarea {
 }
 
 .search-mode-tabs {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  width: min(100%, 760px);
+  margin: 0 auto 1.5rem;
 }
 
 .search-mode-tab {
-  flex: 1;
-  padding: 0.65rem;
+  min-height: 3.25rem;
+  padding: 0.7rem 1rem;
   border-radius: var(--radius-md);
   border: 1.5px solid var(--border);
   background: #ffffff;
@@ -3067,6 +3073,18 @@ input, select, textarea {
   gap: 0.45rem;
   cursor: pointer;
   transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (max-width: 560px) {
+  .search-mode-tabs {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+    margin-bottom: 1.1rem;
+  }
+
+  .search-mode-tab {
+    min-height: 2.9rem;
+  }
 }
 
 .search-mode-tab:hover {
@@ -3319,5 +3337,4 @@ input, select, textarea {
   background: transparent;
   border: none;
 }
-
 

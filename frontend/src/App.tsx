@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
   Header,
 } from './components/Header';
@@ -116,6 +116,7 @@ const PlannerPage: React.FC<{
   onRerouteFromStop,
   onRerouteFromGPS,
 }) => {
+  const isPlannerRoute = useLocation().pathname === '/planner';
   const [searchMode, setSearchMode] = useState<'explorer' | 'standard'>('explorer');
   const [selectedJourneyIndex, setSelectedJourneyIndex] = useState<number>(0);
   const [selectedLegIndex, setSelectedLegIndex] = useState<number | null>(null);
@@ -143,19 +144,20 @@ const PlannerPage: React.FC<{
       {/* Freshness Banner */}
       <DataFreshnessBanner health={health} />
 
-      {/* Step 1 & Step 2: Unified First-Visit Hero with Background, Exact Text & Inline Authentication */}
-      <UnifiedWorkflowHero
-        session={session}
-        onProceedToJourney={() => {
-          const el = document.getElementById('planner-explorer-section');
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }}
-      />
+      {!isPlannerRoute && (
+        <UnifiedWorkflowHero
+          session={session}
+          onProceedToJourney={() => {
+            const el = document.getElementById('planner-explorer-section');
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }}
+        />
+      )}
 
       {/* Step 3: Main Journey Selection & Routing Workspace */}
-      <main className="container app-main" id="planner-explorer-section">
+      <main className={`container app-main${isPlannerRoute ? ' app-main-planner' : ''}`} id="planner-explorer-section">
         {backendError && (
           <div className="alert-box alert-danger" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
             <ServerCrash size={20} />
@@ -166,8 +168,8 @@ const PlannerPage: React.FC<{
         )}
 
         {/* Mode Switcher Tabs */}
-        <div className="search-mode-switcher-bar" style={{ marginBottom: '1.25rem' }}>
-          <div className="search-mode-tabs" style={{ maxWidth: '480px', margin: '0 auto 1.5rem auto' }}>
+        <div className="search-mode-switcher-bar">
+          <div className="search-mode-tabs">
             <button
               type="button"
               className={`search-mode-tab ${searchMode === 'explorer' ? 'active' : ''}`}
@@ -680,46 +682,46 @@ export const App: React.FC = () => {
     setSavedOpen(false);
   };
 
+  const plannerPage = (
+    <PlannerPage
+      session={session}
+      health={health}
+      realtimeStatus={realtimeStatus}
+      backendError={backendError}
+      isPlanning={isPlanning}
+      routePlan={routePlan}
+      planError={planError}
+      selectedOrigin={selectedOrigin}
+      selectedDest={selectedDest}
+      savedOpen={savedOpen}
+      prefOpen={prefOpen}
+      feedbackOpen={feedbackOpen}
+      metroOpen={metroOpen}
+      onPlanRoute={handlePlanRoute}
+      onSaveJourney={handleSaveJourney}
+      onOpenSaved={() => setSavedOpen(true)}
+      onCloseSaved={() => setSavedOpen(false)}
+      onOpenPref={() => setPrefOpen(true)}
+      onClosePref={() => setPrefOpen(false)}
+      onOpenFeedback={() => setFeedbackOpen(true)}
+      onCloseFeedback={() => setFeedbackOpen(false)}
+      onOpenMetro={() => setMetroOpen(true)}
+      onCloseMetro={() => setMetroOpen(false)}
+      onSignOut={handleSignOut}
+      onOpenAccount={() => navigate('/account')}
+      onOpenAuth={() => navigate('/signin')}
+      emergencyRerouteInfo={emergencyRerouteInfo}
+      onDismissEmergency={() => setEmergencyRerouteInfo(null)}
+      onRerouteFromStop={handleRerouteFromStop}
+      onRerouteFromGPS={handleRerouteFromGPS}
+    />
+  );
+
   return (
     <Routes>
       {/* ── Main Site Landing: Displays the 3-Step Continuous Unified Flow ── */}
-      <Route
-        path="/"
-        element={
-          <PlannerPage
-            session={session}
-            health={health}
-            realtimeStatus={realtimeStatus}
-            backendError={backendError}
-            isPlanning={isPlanning}
-            routePlan={routePlan}
-            planError={planError}
-            selectedOrigin={selectedOrigin}
-            selectedDest={selectedDest}
-            savedOpen={savedOpen}
-            prefOpen={prefOpen}
-            feedbackOpen={feedbackOpen}
-            metroOpen={metroOpen}
-            onPlanRoute={handlePlanRoute}
-            onSaveJourney={handleSaveJourney}
-            onOpenSaved={() => setSavedOpen(true)}
-            onCloseSaved={() => setSavedOpen(false)}
-            onOpenPref={() => setPrefOpen(true)}
-            onClosePref={() => setPrefOpen(false)}
-            onOpenFeedback={() => setFeedbackOpen(true)}
-            onCloseFeedback={() => setFeedbackOpen(false)}
-            onOpenMetro={() => setMetroOpen(true)}
-            onCloseMetro={() => setMetroOpen(false)}
-            onSignOut={handleSignOut}
-            onOpenAccount={() => navigate('/account')}
-            onOpenAuth={() => navigate('/signin')}
-            emergencyRerouteInfo={emergencyRerouteInfo}
-            onDismissEmergency={() => setEmergencyRerouteInfo(null)}
-            onRerouteFromStop={handleRerouteFromStop}
-            onRerouteFromGPS={handleRerouteFromGPS}
-          />
-        }
-      />
+      <Route path="/" element={plannerPage} />
+      <Route path="/planner" element={plannerPage} />
 
       {/* ── Direct Route for Standalone Welcome Screen (if visited directly) ── */}
       <Route
@@ -735,12 +737,6 @@ export const App: React.FC = () => {
       {/* ── Standalone Sign In / Sign Up Pages ── */}
       <Route path="/signin" element={<SignInPage />} />
       <Route path="/signup" element={<SignUpPage />} />
-
-      {/* ── Route Alias for /planner ── */}
-      <Route
-        path="/planner"
-        element={<Navigate to="/" replace />}
-      />
 
       {/* Protected account settings */}
       <Route
