@@ -15,9 +15,12 @@
 # Do not commit raw GTFS archives, huge CSV files, or binary protobuf snapshots
 **/data/raw/*
 !**/data/raw/.gitkeep
+!backend/data/raw/mdb-1262/mdb-1262-latest.zip
+!backend/data/raw/dmrc/**
 **/data/processed/*
 !**/data/processed/.gitkeep
 *.zip
+!backend/data/raw/mdb-1262/mdb-1262-latest.zip
 *.tar
 *.tar.gz
 *.tgz

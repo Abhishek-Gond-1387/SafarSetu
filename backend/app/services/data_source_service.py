@@ -49,6 +49,14 @@ class TransitContext:
 
         print(f"[*] Loading GTFS dataset from: {target_dir} (source: {target_source})...")
         if os.path.isdir(target_dir):
+            # Auto-extract zip archive if text files are not present
+            zip_candidate = os.path.join(target_dir, "mdb-1262-latest.zip")
+            if os.path.isfile(zip_candidate) and not os.path.isfile(os.path.join(target_dir, "stops.txt")):
+                print(f"[*] Extracting GTFS bundle from {zip_candidate}...")
+                import zipfile
+                with zipfile.ZipFile(zip_candidate, "r") as zf:
+                    zf.extractall(target_dir)
+
             cls.dataset = GTFSLoader.load(target_dir, source_id=target_source, max_trips=trips_limit)
 
             # Ingest DMRC (Delhi Metro) static dataset if present
