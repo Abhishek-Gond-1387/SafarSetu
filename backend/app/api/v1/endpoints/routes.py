@@ -8,9 +8,12 @@ from app.models.transit import StopTime
 from app.schemas.routing import (
     JourneyLegOut,
     JourneyOut,
+    LostAssistanceRequest,
+    LostAssistanceResponse,
     ModeExploreRequest,
     ModeExploreResponse,
     ModeOption,
+    NearestStationDetail,
     RouteCompareRequest,
     RouteCompareResponse,
     RoutePlanRequest,
@@ -431,4 +434,181 @@ def explore_modes(request: ModeExploreRequest):
         road_distance_km=d_road,
         modes=modes,
     )
+
+
+@router.post("/lost-assistance", response_model=LostAssistanceResponse, summary="Emergency Lost Commuter Rerouting")
+def lost_assistance(req: LostAssistanceRequest):
+    """Emergency Lost Assistance:
+    Locates the commuter's nearest bus stand, auto stand, and metro station,
+    provides pedestrian walking guidance, and recalculates the complete journey to their destination.
+    """
+    ctx = get_transit_context()
+    if not ctx.repository:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Transit repository is not initialized.",
+        )
+
+    # 1. Search for nearby transit within 4 km, expanding to 10 km if needed
+    nearby = ctx.repository.find_nearby_stops(req.user_lat, req.user_lon, radius_meters=4000.0, limit=40)
+    if not nearby:
+        nearby = ctx.repository.find_nearby_stops(req.user_lat, req.user_lon, radius_meters=10000.0, limit=40)
+
+    # Fallback to Rajiv Chowk if coordinates are completely outside or unmapped
+    if not nearby:
+        default_stop = ctx.repository.get_stop("metro_122") or (
+            list(ctx.dataset.stops.values())[0] if ctx.dataset and ctx.dataset.stops else None
+        )
+        if default_stop:
+            nearby = [(default_stop, 1200.0)]
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No transit stops found near the provided location.",
+            )
+
+    # 2. Categorize nearest metro, nearest bus stop, and nearest overall
+    metro_candidates = [pair for pair in nearby if pair[0].stop_id.startswith("metro_")]
+    bus_candidates = [pair for pair in nearby if not pair[0].stop_id.startswith("metro_")]
+
+    nearest_metro_pair = metro_candidates[0] if metro_candidates else None
+    nearest_bus_pair = bus_candidates[0] if bus_candidates else None
+    overall_pair = nearby[0]
+
+    def _build_detail(stop, dist_m: float, st_type: str) -> NearestStationDetail:
+        walk_mins = max(1.0, round(dist_m / 80.0, 1))
+        lines: list[str] = []
+        if ctx.dataset:
+            dep_routes = set()
+            for tid, _, _ in ctx.repository.get_stop_departures(stop.stop_id)[:20]:
+                trip = ctx.repository.get_trip(tid)
+                if trip and trip.route_id:
+                    route = ctx.repository.get_route(trip.route_id)
+                    if route:
+                        dep_routes.add(route.route_short_name or route.route_long_name)
+            lines = sorted(list(dep_routes))[:4]
+
+        if st_type == "metro":
+            dirs = f"Walk ~{int(dist_m)}m ({walk_mins} mins) to {stop.stop_name} Metro Station. Enter via nearest customer gate."
+        elif st_type == "auto_stand":
+            dirs = f"Dedicated Auto/E-Rickshaw stand located at the entrance of {stop.stop_name}."
+        else:
+            dirs = f"Walk ~{int(dist_m)}m ({walk_mins} mins) to {stop.stop_name} DTC Bus Stand."
+
+        return NearestStationDetail(
+            stop_id=stop.stop_id,
+            stop_name=stop.stop_name,
+            stop_lat=stop.stop_lat,
+            stop_lon=stop.stop_lon,
+            type=st_type,
+            distance_meters=round(dist_m, 1),
+            walk_minutes=walk_mins,
+            lines=lines,
+            directions_text=dirs,
+        )
+
+    nearest_metro_detail = (
+        _build_detail(nearest_metro_pair[0], nearest_metro_pair[1], "metro")
+        if nearest_metro_pair
+        else None
+    )
+    nearest_bus_detail = (
+        _build_detail(nearest_bus_pair[0], nearest_bus_pair[1], "bus")
+        if nearest_bus_pair
+        else None
+    )
+
+    overall_type = "metro" if overall_pair[0].stop_id.startswith("metro_") else "bus"
+    nearest_overall_detail = _build_detail(overall_pair[0], overall_pair[1], overall_type)
+
+    # Auto rickshaw fare estimate from location to closest metro or major hub
+    auto_dist_km = (
+        round(nearest_metro_pair[1] / 1000.0, 1)
+        if nearest_metro_pair
+        else round(overall_pair[1] / 1000.0, 1)
+    )
+    auto_fare = 30.0 if auto_dist_km <= 1.5 else round(30.0 + (auto_dist_km - 1.5) * 11.0)
+    auto_pickup = (
+        f"Official GNCTD Auto-Rickshaw Stand available at {nearest_overall_detail.stop_name} "
+        f"or flag any passing green-yellow auto."
+    )
+
+    # 3. Reroute / Map Journey to Destination if provided
+    dest_id = req.destination_stop_id
+    if not dest_id and req.destination_name and ctx.repository:
+        stops, _ = ctx.repository.search_stops(req.destination_name, page=1, page_size=5)
+        if stops:
+            m = [s for s in stops if s.stop_id.startswith("metro_")]
+            dest_id = m[0].stop_id if m else stops[0].stop_id
+
+    rerouted_plan: Optional[RoutePlanResponse] = None
+    if dest_id and ctx.router:
+        best_origin_stop = (
+            nearest_metro_pair[0]
+            if (nearest_metro_pair and nearest_metro_pair[1] <= 2500.0)
+            else overall_pair[0]
+        )
+
+        now_dt = datetime.now()
+        dep_str = now_dt.strftime("%H:%M:%S")
+
+        try:
+            plan_req = RoutePlanRequest(
+                origin_stop_id=best_origin_stop.stop_id,
+                destination_stop_id=dest_id,
+                departure_date=now_dt.date(),
+                departure_time=dep_str,
+                criterion="fastest",
+                max_transfers=3,
+                max_walk_meters=1000,
+                mode_preference=req.preferred_mode or "all",
+            )
+            rerouted_plan = plan_route(plan_req)
+            if rerouted_plan:
+                rerouted_plan.data_freshness_warnings.insert(
+                    0,
+                    f"🚨 Emergency Reroute Activated: Journey re-mapped from closest transit hub ({best_origin_stop.stop_name}).",
+                )
+        except Exception:
+            rerouted_plan = None
+
+    # 4. Construct reassuring message and spoken guidance
+    chosen_stop_name = (
+        nearest_metro_detail.stop_name
+        if nearest_metro_detail
+        else nearest_overall_detail.stop_name
+    )
+    dist_txt = (
+        f"{int(nearest_metro_detail.distance_meters if nearest_metro_detail else nearest_overall_detail.distance_meters)} meters"
+    )
+
+    dest_txt = ""
+    if rerouted_plan and ctx.dataset and dest_id in ctx.dataset.stops:
+        dest_txt = f" to {ctx.dataset.stops[dest_id].stop_name}"
+
+    reassuring_msg = (
+        f"You are safe. The closest transit hub is {chosen_stop_name} ({dist_txt} away). "
+        f"Follow the walking directions or take an auto-rickshaw (~₹{auto_fare}). "
+        f"Your updated route{dest_txt} has been mapped below."
+    )
+
+    spoken = {
+        "en": f"Don't worry! You are near {chosen_stop_name}, approximately {dist_txt} away. I have re-mapped your journey{dest_txt}.",
+        "hi": f"चिंता न करें! आप {chosen_stop_name} के पास हैं (लगभग {dist_txt} दूर)। आपकी यात्रा का नया रूट तैयार कर दिया गया है।",
+        "hinglish": f"Fret not! Aap {chosen_stop_name} ke paas hain (~{dist_txt} door). Humne aapka safar naye sire se map kar diya hai.",
+    }
+
+    return LostAssistanceResponse(
+        user_lat=req.user_lat,
+        user_lon=req.user_lon,
+        nearest_metro=nearest_metro_detail,
+        nearest_bus_stop=nearest_bus_detail,
+        nearest_station_overall=nearest_overall_detail,
+        auto_rickshaw_fare_estimate_inr=float(auto_fare),
+        auto_pickup_instructions=auto_pickup,
+        rerouted_plan=rerouted_plan,
+        reassuring_message=reassuring_msg,
+        spoken_guidance=spoken,
+    )
+
 

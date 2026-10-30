@@ -36,6 +36,9 @@ class TransitContext:
         source_id: Optional[str] = None,
         max_trips: Optional[int] = None,
     ):
+        if cls.is_initialized and cls.dataset and not cls.dataset.is_empty:
+            return
+
         target_dir = gtfs_dir or settings.GTFS_DATA_DIR
         if not os.path.isdir(target_dir):
             backend_candidate = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), target_dir)

@@ -273,6 +273,97 @@ export interface NearbyStopsResponse {
   results: NearbyStopItem[];
 }
 
+export interface NearestStationDetail {
+  stop_id: string;
+  stop_name: string;
+  stop_lat: number;
+  stop_lon: number;
+  type: 'metro' | 'bus' | 'auto_stand';
+  distance_meters: number;
+  walk_minutes: number;
+  lines: string[];
+  directions_text: string;
+}
+
+export interface LostAssistanceRequest {
+  user_lat: number;
+  user_lon: number;
+  destination_stop_id?: string;
+  destination_name?: string;
+  preferred_mode?: string;
+}
+
+export interface LostAssistanceResponse {
+  user_lat: number;
+  user_lon: number;
+  nearest_metro: NearestStationDetail | null;
+  nearest_bus_stop: NearestStationDetail | null;
+  nearest_station_overall: NearestStationDetail;
+  auto_rickshaw_fare_estimate_inr: number;
+  auto_pickup_instructions: string;
+  rerouted_plan: RoutePlanResponse | null;
+  reassuring_message: string;
+  spoken_guidance: {
+    en?: string;
+    hi?: string;
+    hinglish?: string;
+  };
+}
+
+export interface VoiceStepGuidance {
+  step_number: number;
+  total_steps: number;
+  step_type: 'walk' | 'board_metro' | 'board_bus' | 'in_transit' | 'transfer' | 'alight' | 'destination';
+  spoken_instruction: string;
+  display_instruction: string;
+  stop_name: string;
+  line_name?: string;
+  headsign?: string;
+  duration_minutes?: number;
+  distance_meters?: number;
+  next_stop_name?: string;
+  fare_inr?: number;
+}
+
+export interface VoiceQueryRequest {
+  query: string;
+  language?: string;
+  target_language?: string;
+  session_id?: string;
+  current_journey?: Journey | null;
+  current_leg_index?: number | null;
+  user_lat?: number | null;
+  user_lon?: number | null;
+}
+
+export interface VoiceQueryResponse {
+  success: boolean;
+  transcript: string;
+  detected_language: string;
+  response_language: string;
+  intent: string;
+  spoken_text: string;
+  display_text: string;
+  action?: 'NAVIGATE' | 'REROUTE' | 'STEP_GUIDANCE' | 'SET_FILTER' | 'NONE';
+  entities?: Record<string, any>;
+  planned_route?: RoutePlanResponse | null;
+  step_guidance?: VoiceStepGuidance | null;
+  suggested_followups: string[];
+}
+
+export interface VoiceLanguageItem {
+  code: string;
+  name: string;
+  native_name: string;
+  locale: string;
+  speech_supported: boolean;
+}
+
+export interface VoiceLanguagesResponse {
+  supported_languages: VoiceLanguageItem[];
+  default: string;
+}
+
 export const SafarSetuAPI = {
   // Transit Search & Routing
   async searchStops(query: string, pageSize: number = 10): Promise<StopsSearchResponse> {
@@ -295,6 +386,13 @@ export const SafarSetuAPI = {
     return fetchJSON<RoutePlanResponse>('/routes/plan', {
       method: 'POST',
       body: JSON.stringify(params),
+    });
+  },
+
+  async getLostAssistance(req: LostAssistanceRequest): Promise<LostAssistanceResponse> {
+    return fetchJSON<LostAssistanceResponse>('/routes/lost-assistance', {
+      method: 'POST',
+      body: JSON.stringify(req),
     });
   },
 
@@ -405,5 +503,29 @@ export const SafarSetuAPI = {
     return fetchJSON('/users/me', {
       method: 'DELETE',
     });
+  },
+
+  // Multilingual Voice Assistant
+  async sendVoiceQuery(params: VoiceQueryRequest): Promise<VoiceQueryResponse> {
+    return fetchJSON<VoiceQueryResponse>('/voice/interact', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  },
+
+  async getVoiceStepGuidance(params: {
+    journey: Journey;
+    leg_index: number;
+    sub_step?: string;
+    target_language?: string;
+  }): Promise<VoiceStepGuidance> {
+    return fetchJSON<VoiceStepGuidance>('/voice/guidance', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  },
+
+  async getVoiceLanguages(): Promise<VoiceLanguagesResponse> {
+    return fetchJSON<VoiceLanguagesResponse>('/voice/languages');
   },
 };

@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import {
-  Header,
-} from './components/Header';
+import { Sidebar } from './components/Sidebar';
 import { UnifiedWorkflowHero } from './components/UnifiedWorkflowHero';
 import { DataFreshnessBanner } from './components/DataFreshnessBanner';
 import { JourneySearch } from './components/JourneySearch';
@@ -13,6 +11,9 @@ import { SavedJourneysModal } from './components/SavedJourneysModal';
 import { PreferencesModal } from './components/PreferencesModal';
 import { FeedbackModal } from './components/FeedbackModal';
 import { MetroStatusModal } from './components/MetroStatusModal';
+import { LogoutConfirmModal } from './components/LogoutConfirmModal';
+import { VoiceAssistantModal } from './components/VoiceAssistantModal';
+import { LostAssistanceModal } from './components/LostAssistanceModal';
 import { SignInPage } from './pages/SignInPage';
 import { SignUpPage } from './pages/SignUpPage';
 import { AccountPage } from './pages/AccountPage';
@@ -35,6 +36,7 @@ import {
   ServerCrash,
   Navigation,
   MapPin,
+  Mic,
 } from 'lucide-react';
 
 /* ──────────────────────────────────────────────────────────
@@ -84,6 +86,8 @@ const PlannerPage: React.FC<{
   onDismissEmergency: () => void;
   onRerouteFromStop: (stop: { stop_id: string; stop_name: string; lat?: number; lon?: number }) => void;
   onRerouteFromGPS: () => void;
+  onOpenVoice?: () => void;
+  onOpenLost?: () => void;
 }> = ({
   session,
   health,
@@ -115,6 +119,8 @@ const PlannerPage: React.FC<{
   onDismissEmergency,
   onRerouteFromStop,
   onRerouteFromGPS,
+  onOpenVoice,
+  onOpenLost,
 }) => {
   const isPlannerRoute = useLocation().pathname === '/planner';
   const [searchMode, setSearchMode] = useState<'explorer' | 'standard'>('explorer');
@@ -128,8 +134,8 @@ const PlannerPage: React.FC<{
 
   return (
     <div className="app-layout">
-      {/* Top Header */}
-      <Header
+      {/* Navigation Sidebar */}
+      <Sidebar
         session={session}
         realtimeStatus={realtimeStatus}
         onOpenAuth={onOpenAuth}
@@ -139,10 +145,13 @@ const PlannerPage: React.FC<{
         onOpenFeedback={onOpenFeedback}
         onOpenAccount={onOpenAccount}
         onOpenMetroStatus={onOpenMetro}
+        onOpenVoice={onOpenVoice}
+        onOpenLost={onOpenLost}
       />
 
-      {/* Freshness Banner */}
-      <DataFreshnessBanner health={health} />
+      <div className="app-main-content">
+        {/* Freshness Banner */}
+        <DataFreshnessBanner health={health} />
 
       {!isPlannerRoute && (
         <UnifiedWorkflowHero
@@ -468,6 +477,7 @@ const PlannerPage: React.FC<{
           </div>
         )}
       </main>
+      </div>
 
       {/* Modals */}
       <SavedJourneysModal
@@ -524,6 +534,10 @@ export const App: React.FC = () => {
   const [prefOpen, setPrefOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [metroOpen, setMetroOpen] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [voiceAssistantOpen, setVoiceAssistantOpen] = useState(false);
+  const [lostModalOpen, setLostModalOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Initialize Auth Listener & Health Fetch
   useEffect(() => {
@@ -661,9 +675,19 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleSignOut = async () => {
-    await supabaseAuth.signOut();
-    navigate('/signin');
+  const handleSignOutClick = () => {
+    setLogoutConfirmOpen(true);
+  };
+
+  const handleConfirmSignOut = async () => {
+    setIsSigningOut(true);
+    try {
+      await supabaseAuth.signOut();
+      setLogoutConfirmOpen(false);
+      navigate('/signin');
+    } finally {
+      setIsSigningOut(false);
+    }
   };
 
   const handleSelectSavedJourney = async (originId: string, destId: string) => {
@@ -707,18 +731,21 @@ export const App: React.FC = () => {
       onCloseFeedback={() => setFeedbackOpen(false)}
       onOpenMetro={() => setMetroOpen(true)}
       onCloseMetro={() => setMetroOpen(false)}
-      onSignOut={handleSignOut}
+      onSignOut={handleSignOutClick}
       onOpenAccount={() => navigate('/account')}
       onOpenAuth={() => navigate('/signin')}
       emergencyRerouteInfo={emergencyRerouteInfo}
       onDismissEmergency={() => setEmergencyRerouteInfo(null)}
       onRerouteFromStop={handleRerouteFromStop}
       onRerouteFromGPS={handleRerouteFromGPS}
+      onOpenVoice={() => setVoiceAssistantOpen(true)}
+      onOpenLost={() => setLostModalOpen(true)}
     />
   );
 
   return (
-    <Routes>
+    <>
+      <Routes>
       {/* ── Main Site Landing: Displays the 3-Step Continuous Unified Flow ── */}
       <Route path="/" element={plannerPage} />
       <Route path="/planner" element={plannerPage} />
@@ -751,6 +778,49 @@ export const App: React.FC = () => {
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+
+      <LostAssistanceModal
+        isOpen={lostModalOpen}
+        onClose={() => setLostModalOpen(false)}
+        activeDestinationId={lastPlanParams?.destination_stop_id || routePlan?.destination_stop_id}
+        activeDestinationName={
+          routePlan?.journeys?.[0]?.legs?.[routePlan.journeys[0].legs.length - 1]?.to_stop_name ||
+          selectedDest?.stop_name ||
+          ''
+        }
+        onApplyReroute={(reroutedPlan, fromStopName) => {
+          setRoutePlan(reroutedPlan);
+          setEmergencyRerouteInfo({
+            stop_name: fromStopName,
+            original_origin: routePlan?.origin_stop_id || 'Previous Location',
+          });
+          setLostModalOpen(false);
+        }}
+      />
+
+      <VoiceAssistantModal
+        isOpen={voiceAssistantOpen}
+        onClose={() => setVoiceAssistantOpen(false)}
+        activeJourney={routePlan?.journeys?.[0] || null}
+        activeLegIndex={0}
+        onPlanRoute={handlePlanRoute}
+        onApplyReroute={(reroutedPlan) => {
+          setRoutePlan(reroutedPlan);
+          setEmergencyRerouteInfo({
+            stop_name: reroutedPlan.origin_stop_id,
+            original_origin: routePlan?.origin_stop_id || '',
+          });
+        }}
+        onSelectLeg={() => {}}
+      />
+
+      <LogoutConfirmModal
+        isOpen={logoutConfirmOpen}
+        onClose={() => setLogoutConfirmOpen(false)}
+        onConfirm={handleConfirmSignOut}
+        isLoggingOut={isSigningOut}
+      />
+    </>
   );
 };
 

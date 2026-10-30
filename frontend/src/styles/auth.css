@@ -26,13 +26,11 @@
 .auth-scrim-primary {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    90deg,
-    rgba(10, 24, 46, 0.6) 0%,
-    rgba(12, 28, 54, 0.3) 38%,
-    rgba(14, 34, 66, 0.1) 65%,
-    rgba(15, 23, 42, 0.16) 100%
-  );
+  background: linear-gradient(90deg,
+      rgba(10, 24, 46, 0.6) 0%,
+      rgba(12, 28, 54, 0.3) 38%,
+      rgba(14, 34, 66, 0.1) 65%,
+      rgba(15, 23, 42, 0.16) 100%);
   z-index: 1;
   pointer-events: none;
 }
@@ -41,13 +39,11 @@
 .auth-scrim-vertical {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    180deg,
-    rgba(10, 24, 46, 0.25) 0%,
-    transparent 30%,
-    transparent 75%,
-    rgba(10, 24, 46, 0.35) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(10, 24, 46, 0.25) 0%,
+      transparent 30%,
+      transparent 75%,
+      rgba(10, 24, 46, 0.35) 100%);
   z-index: 1;
   pointer-events: none;
 }
@@ -56,12 +52,10 @@
 .auth-scrim-warmth {
   position: absolute;
   inset: 0;
-  background: radial-gradient(
-    circle at 50% 75%,
-    rgba(254, 215, 170, 0.25) 0%,
-    rgba(253, 186, 116, 0.1) 35%,
-    transparent 70%
-  );
+  background: radial-gradient(circle at 50% 75%,
+      rgba(254, 215, 170, 0.25) 0%,
+      rgba(253, 186, 116, 0.1) 35%,
+      transparent 70%);
   mix-blend-mode: screen;
   pointer-events: none;
   z-index: 1;
@@ -69,7 +63,8 @@
 
 /* ── Left branding panel ─────────────────────────────────── */
 .auth-brand {
-  display: none; /* hidden on mobile */
+  display: none;
+  /* hidden on mobile */
   flex: 1;
   position: relative;
   overflow: hidden;
@@ -92,18 +87,19 @@
   position: absolute;
   width: 520px;
   height: 520px;
-  border: 1px solid rgba(255,255,255,0.07);
+  border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 50%;
   top: -120px;
   left: -180px;
   pointer-events: none;
 }
+
 .auth-brand::after {
   content: '';
   position: absolute;
   width: 380px;
   height: 380px;
-  border: 1px solid rgba(255,255,255,0.07);
+  border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 50%;
   bottom: -80px;
   right: -100px;
@@ -125,7 +121,7 @@
 .auth-brand-logo-icon {
   width: 44px;
   height: 44px;
-  background: rgba(255,255,255,0.15);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -143,7 +139,7 @@
 
 .auth-brand-logo span {
   font-size: 0.78rem;
-  color: rgba(255,255,255,0.65);
+  color: rgba(255, 255, 255, 0.65);
   font-weight: 400;
   display: block;
 }
@@ -173,7 +169,7 @@
 }
 
 .auth-brand-sub {
-  color: rgba(255,255,255,0.7);
+  color: rgba(255, 255, 255, 0.7);
   font-size: 1rem;
   line-height: 1.6;
   max-width: 340px;
@@ -198,7 +194,7 @@
 
 .auth-stat-label {
   font-size: 0.78rem;
-  color: rgba(255,255,255,0.55);
+  color: rgba(255, 255, 255, 0.55);
   margin-top: 0.2rem;
 }
 
@@ -223,20 +219,18 @@
 .auth-route-line {
   flex: 1;
   height: 2px;
-  background: repeating-linear-gradient(
-    90deg,
-    rgba(94,234,212,0.4) 0px,
-    rgba(94,234,212,0.4) 8px,
-    transparent 8px,
-    transparent 16px
-  );
+  background: repeating-linear-gradient(90deg,
+      rgba(94, 234, 212, 0.4) 0px,
+      rgba(94, 234, 212, 0.4) 8px,
+      transparent 8px,
+      transparent 16px);
 }
 
 .auth-brand-bottom {
   position: relative;
   z-index: 2;
   font-size: 0.76rem;
-  color: rgba(255,255,255,0.35);
+  color: rgba(255, 255, 255, 0.35);
 }
 
 /* ── Right form panel (Fully transparent so the entire illustration is visible) ── */
@@ -576,7 +570,7 @@
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.15);
+  background: rgba(255, 255, 255, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -584,7 +578,7 @@
   font-size: 1.8rem;
   font-weight: 700;
   color: #5eead4;
-  border: 3px solid rgba(255,255,255,0.2);
+  border: 3px solid rgba(255, 255, 255, 0.2);
 }
 
 .account-hero h2 {
@@ -594,7 +588,7 @@
 
 .account-hero p {
   font-size: 0.9rem;
-  color: rgba(255,255,255,0.65);
+  color: rgba(255, 255, 255, 0.65);
   margin-top: 0.25rem;
 }
 
@@ -612,7 +606,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 1.4rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
 .account-card h3 {
@@ -707,7 +701,7 @@
   align-items: center;
   gap: 0.4rem;
   font-size: 0.85rem;
-  color: rgba(255,255,255,0.75);
+  color: rgba(255, 255, 255, 0.75);
   background: none;
   border: none;
   cursor: pointer;
@@ -724,7 +718,7 @@
 .confirm-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -738,7 +732,7 @@
   padding: 1.75rem;
   max-width: 380px;
   width: 100%;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
 }
 
 .confirm-box h3 {
@@ -799,7 +793,7 @@
 .auth-spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(255,255,255,0.4);
+  border: 2px solid rgba(255, 255, 255, 0.4);
   border-top-color: #fff;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
@@ -809,7 +803,7 @@
 .auth-spinner-dark {
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(15,118,110,0.25);
+  border: 2px solid rgba(15, 118, 110, 0.25);
   border-top-color: #0f766e;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
@@ -817,7 +811,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Password strength bar */
@@ -835,14 +831,24 @@
   transition: background 0.25s;
 }
 
-.pw-strength-bar.weak  { background: #ef4444; }
-.pw-strength-bar.fair  { background: #f59e0b; }
-.pw-strength-bar.good  { background: #22c55e; }
-.pw-strength-bar.strong{ background: #0f766e; }
+.pw-strength-bar.weak {
+  background: #ef4444;
+}
+
+.pw-strength-bar.fair {
+  background: #f59e0b;
+}
+
+.pw-strength-bar.good {
+  background: #22c55e;
+}
+
+.pw-strength-bar.strong {
+  background: #0f766e;
+}
 
 .pw-strength-label {
   font-size: 0.75rem;
   margin-top: 0.25rem;
   color: #94a3b8;
 }
-

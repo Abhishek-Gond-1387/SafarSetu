@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { supabaseAuth, UserSession } from '../lib/supabase';
 import { SafarSetuAPI } from '../lib/api';
+import { LogoutConfirmModal } from '../components/LogoutConfirmModal';
 import '../styles/auth.css';
 import '../styles/app.css';
 
@@ -26,6 +27,8 @@ export const AccountPage: React.FC<AccountPageProps> = ({ session }) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
     if (!session) {
@@ -53,9 +56,19 @@ export const AccountPage: React.FC<AccountPageProps> = ({ session }) => {
     }
   };
 
-  const handleSignOut = async () => {
-    await supabaseAuth.signOut();
-    navigate('/signin');
+  const handleSignOutClick = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const handleConfirmSignOut = async () => {
+    setIsSigningOut(true);
+    try {
+      await supabaseAuth.signOut();
+      setShowLogoutConfirm(false);
+      navigate('/signin');
+    } finally {
+      setIsSigningOut(false);
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -138,7 +151,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({ session }) => {
             type="button"
             className="auth-btn-secondary"
             style={{ marginBottom: '0.75rem' }}
-            onClick={handleSignOut}
+            onClick={handleSignOutClick}
           >
             <LogOut size={16} />
             Sign Out
@@ -170,6 +183,14 @@ export const AccountPage: React.FC<AccountPageProps> = ({ session }) => {
           </button>
         </div>
       </div>
+
+      {/* Confirm logout dialog */}
+      <LogoutConfirmModal
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={handleConfirmSignOut}
+        isLoggingOut={isSigningOut}
+      />
 
       {/* Confirm delete dialog */}
       {showConfirm && (

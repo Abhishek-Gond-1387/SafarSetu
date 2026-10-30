@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     SUPABASE_JWT_ALGORITHM: str = "HS256"
     SUPABASE_JWT_AUDIENCE: str = "authenticated"
 
+    # AI Voice Assistant Settings (Google Gemini / OpenAI)
+    GEMINI_API_KEY: Optional[str] = None
+    OPENAI_API_KEY: Optional[str] = None
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:

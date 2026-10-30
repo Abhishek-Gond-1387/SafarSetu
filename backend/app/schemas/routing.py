@@ -217,3 +217,39 @@ class HealthResponse(BaseModel):
     graph_edges: int = 0
     realtime: Optional[RealtimeStatusResponse] = None
 
+
+# ─── Lost Commuter Rerouting schemas ──────────────────────────────────────────
+
+class NearestStationDetail(BaseModel):
+    stop_id: str
+    stop_name: str
+    stop_lat: float
+    stop_lon: float
+    type: str = Field(..., description="'metro', 'bus', 'auto_stand'")
+    distance_meters: float
+    walk_minutes: float
+    lines: List[str] = Field(default_factory=list)
+    directions_text: str = ""
+
+
+class LostAssistanceRequest(BaseModel):
+    user_lat: float = Field(..., ge=-90.0, le=90.0)
+    user_lon: float = Field(..., ge=-180.0, le=180.0)
+    destination_stop_id: Optional[str] = None
+    destination_name: Optional[str] = None
+    preferred_mode: Optional[str] = Field("all", description="'all', 'metro', 'bus', 'auto'")
+
+
+class LostAssistanceResponse(BaseModel):
+    user_lat: float
+    user_lon: float
+    nearest_metro: Optional[NearestStationDetail] = None
+    nearest_bus_stop: Optional[NearestStationDetail] = None
+    nearest_station_overall: NearestStationDetail
+    auto_rickshaw_fare_estimate_inr: float = 60.0
+    auto_pickup_instructions: str = ""
+    rerouted_plan: Optional[RoutePlanResponse] = None
+    reassuring_message: str
+    spoken_guidance: Dict[str, str] = Field(default_factory=dict)
+
+
