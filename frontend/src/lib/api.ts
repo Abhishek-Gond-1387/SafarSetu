@@ -7,16 +7,22 @@
 import { supabaseAuth } from './supabase';
 
 const getApiBase = () => {
+  let base = '';
   if (typeof (globalThis as any).process !== 'undefined' && (globalThis as any).process?.env?.NEXT_PUBLIC_API_BASE_URL) {
-    return (globalThis as any).process.env.NEXT_PUBLIC_API_BASE_URL;
-  }
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_BASE_URL) {
-    return (import.meta as any).env.VITE_API_BASE_URL;
-  }
-  if (typeof window !== 'undefined' && (window.location.port === '5173' || window.location.port === '5174')) {
+    base = (globalThis as any).process.env.NEXT_PUBLIC_API_BASE_URL;
+  } else if (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_BASE_URL) {
+    base = (import.meta as any).env.VITE_API_BASE_URL;
+  } else if (typeof window !== 'undefined' && (window.location.port === '5173' || window.location.port === '5174')) {
     return 'http://127.0.0.1:8000/api/v1';
+  } else {
+    return '/api/v1';
   }
-  return '/api/v1';
+
+  base = base.trim().replace(/\/+$/, '');
+  if (base && !base.endsWith('/api/v1')) {
+    base = `${base}/api/v1`;
+  }
+  return base;
 };
 
 const API_BASE = getApiBase();
