@@ -21,6 +21,7 @@ import { AccountPage } from './pages/AccountPage';
 import { WelcomeLandingPage } from './pages/WelcomeLandingPage';
 import {
   SafarSetuAPI,
+  API_BASE,
   HealthResponse,
   RealtimeStatusResponse,
   RoutePlanResponse,
@@ -571,7 +572,7 @@ export const App: React.FC = () => {
         setHealth(hRes);
         setBackendError(null);
       } else {
-        setBackendError('Backend service is currently unreachable on localhost:8000');
+        setBackendError('Backend service is unreachable. Checking backend at ' + API_BASE);
       }
       if (rtRes) {
         setRealtimeStatus(rtRes);

@@ -12,10 +12,14 @@ const getApiBase = () => {
     base = (globalThis as any).process.env.NEXT_PUBLIC_API_BASE_URL;
   } else if (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_BASE_URL) {
     base = (import.meta as any).env.VITE_API_BASE_URL;
-  } else if (typeof window !== 'undefined' && (window.location.port === '5173' || window.location.port === '5174')) {
-    return 'http://127.0.0.1:8000/api/v1';
-  } else {
-    return '/api/v1';
+  }
+
+  if (!base) {
+    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      return 'http://127.0.0.1:8000/api/v1';
+    }
+    // Production deployed fallback
+    base = 'https://safarsetu-2.onrender.com';
   }
 
   base = base.trim().replace(/\/+$/, '');
@@ -25,7 +29,7 @@ const getApiBase = () => {
   return base;
 };
 
-const API_BASE = getApiBase();
+export const API_BASE = getApiBase();
 
 async function fetchJSON<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const session = supabaseAuth.getSession();
