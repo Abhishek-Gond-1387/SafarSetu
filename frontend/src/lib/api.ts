@@ -10,16 +10,16 @@ const getApiBase = () => {
   let base = '';
   if (typeof (globalThis as any).process !== 'undefined' && (globalThis as any).process?.env?.NEXT_PUBLIC_API_BASE_URL) {
     base = (globalThis as any).process.env.NEXT_PUBLIC_API_BASE_URL;
-  } else if (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_BASE_URL) {
-    base = (import.meta as any).env.VITE_API_BASE_URL;
+  } else if (typeof import.meta !== 'undefined') {
+    base = (import.meta as any).env?.VITE_API_BASE_URL || (import.meta as any).env?.VITE_API_URL || '';
   }
 
   if (!base) {
     if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
       return 'http://127.0.0.1:8000/api/v1';
     }
-    // Production deployed fallback
-    base = 'https://safarsetu-2.onrender.com';
+    // Production Cloudflare Tunnel / Deployed Fallback
+    base = 'https://dna-throat-customers-roles.trycloudflare.com';
   }
 
   base = base.trim().replace(/\/+$/, '');

@@ -106,3 +106,4 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         # Attach high-precision response processing time header
         response.headers["X-Process-Time"] = f"{duration * 1000:.2f}ms"
         return response
+

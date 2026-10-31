@@ -77,3 +77,4 @@ class SafarSetuCommuterUser(HttpUser):
     def test_prometheus_metrics(self):
         """Simulate monitoring scraper pulling telemetry metrics."""
         self.client.get("/metrics", name="/metrics")
+

@@ -152,3 +152,4 @@ gemini_ai_breaker = CircuitBreaker(
     failure_threshold=3,
     recovery_time_seconds=30.0,
 )
+

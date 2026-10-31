@@ -102,3 +102,4 @@ def generate_route_plan_cache_key(
         bucketed_time = departure_time
 
     return f"route:{origin_id}:{dest_id}:{departure_date}:{bucketed_time}:{criterion}"
+

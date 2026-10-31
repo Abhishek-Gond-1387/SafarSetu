@@ -39,3 +39,4 @@ ON public.profiles (updated_at DESC);
 ANALYZE public.safety_feedback;
 ANALYZE public.saved_journeys;
 ANALYZE public.profiles;
+
