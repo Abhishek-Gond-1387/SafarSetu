@@ -306,6 +306,27 @@ class RoutingEngine:
                     )
 
         if not found_journeys:
+            # Fallback for mode_filter == "metro": if pure metro rail cannot connect the requested endpoints
+            # (e.g. one or both are bus stops or beyond walking transfer threshold), fallback to multimodal transit
+            if mode_filter == "metro":
+                multimodal_journeys, multimodal_reason = self.plan_journey(
+                    origin_stop_id=origin_stop_id,
+                    destination_stop_id=destination_stop_id,
+                    departure_date=departure_date,
+                    departure_seconds=departure_seconds,
+                    max_transfers=max_transfers,
+                    criterion=criterion,
+                    max_candidates=max_candidates,
+                    mode_filter="all",
+                )
+                if multimodal_journeys:
+                    for mj in multimodal_journeys:
+                        mj.warnings.append(
+                            "Direct pure-metro rail is not available between these exact street stops. "
+                            "Showing optimized Metro + feeder/bus transit itinerary."
+                        )
+                    return multimodal_journeys, None
+
             reason = (
                 f"No feasible transit route found between '{self.dataset.stops[origin_stop_id].stop_name}' "
                 f"and '{self.dataset.stops[destination_stop_id].stop_name}' for departure time "

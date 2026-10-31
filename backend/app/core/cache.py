@@ -90,6 +90,7 @@ def generate_route_plan_cache_key(
     departure_date: str,
     departure_time: str,
     criterion: str = "fastest",
+    mode_preference: str = "all",
 ) -> str:
     """Generate normalized cache key grouped into 5-minute time windows."""
     # Group time into 5-minute intervals (e.g., 09:03 -> 09:00, 09:07 -> 09:05)
@@ -101,5 +102,5 @@ def generate_route_plan_cache_key(
     else:
         bucketed_time = departure_time
 
-    return f"route:{origin_id}:{dest_id}:{departure_date}:{bucketed_time}:{criterion}"
+    return f"route:{origin_id}:{dest_id}:{departure_date}:{bucketed_time}:{criterion}:{mode_preference}"
 

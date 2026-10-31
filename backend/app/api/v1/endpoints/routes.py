@@ -72,6 +72,7 @@ def plan_route(req: RoutePlanRequest = Body(...)):
         departure_date=req.departure_date.isoformat(),
         departure_time=req.departure_time,
         criterion=req.criterion,
+        mode_preference=req.mode_preference or "all",
     )
     cached_plan = route_plan_cache.get(cache_key)
     if cached_plan is not None:
@@ -242,7 +243,8 @@ def plan_route(req: RoutePlanRequest = Body(...)):
         calendar_validity_note=cal_note,
         no_route_reason=no_route_reason,
     )
-    route_plan_cache.set(cache_key, response, ttl_seconds=300.0)
+    if journeys_out:
+        route_plan_cache.set(cache_key, response, ttl_seconds=300.0)
     return response
 
 
@@ -303,9 +305,9 @@ def explore_modes(request: ModeExploreRequest):
     d_km = max(0.5, round(dist_m / 1000.0, 1))
     d_road = round(d_km * 1.28, 1)
 
-    # Find nearby stops for both endpoints
-    origin_nearby = ctx.repository.find_nearby_stops(origin_stop.stop_lat, origin_stop.stop_lon, radius_meters=3500.0, limit=25)
-    dest_nearby = ctx.repository.find_nearby_stops(dest_stop.stop_lat, dest_stop.stop_lon, radius_meters=3500.0, limit=25)
+    # Find nearby stops for both endpoints (8 km radius to ensure Metro connection anywhere in Delhi NCR)
+    origin_nearby = ctx.repository.find_nearby_stops(origin_stop.stop_lat, origin_stop.stop_lon, radius_meters=8000.0, limit=35)
+    dest_nearby = ctx.repository.find_nearby_stops(dest_stop.stop_lat, dest_stop.stop_lon, radius_meters=8000.0, limit=35)
 
     # Partition into Metro and Bus stops
     orig_stops = [pair[0] for pair in origin_nearby]

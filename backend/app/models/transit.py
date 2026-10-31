@@ -368,15 +368,19 @@ class GTFSDataset:
         # Merge Calendar
         for cid, c in other.calendar.items():
             new_cid = f"{prefix}{cid}"
+            # Delhi Metro operates daily across all 11 corridors; DMRC static GTFS timetable trips
+            # are indexed under 'weekday' (5,379 trips) while weekend schedules share the same corridor headway.
+            # Enable 7-day operation for DMRC services so weekend journeys route properly.
+            is_dmrc_weekday = "weekday" in cid.lower()
             self.calendar[new_cid] = CalendarService(
                 service_id=new_cid,
-                monday=c.monday,
-                tuesday=c.tuesday,
-                wednesday=c.wednesday,
-                thursday=c.thursday,
-                friday=c.friday,
-                saturday=c.saturday,
-                sunday=c.sunday,
+                monday=c.monday or is_dmrc_weekday,
+                tuesday=c.tuesday or is_dmrc_weekday,
+                wednesday=c.wednesday or is_dmrc_weekday,
+                thursday=c.thursday or is_dmrc_weekday,
+                friday=c.friday or is_dmrc_weekday,
+                saturday=True if is_dmrc_weekday else c.saturday,
+                sunday=True if is_dmrc_weekday else c.sunday,
                 start_date=c.start_date,
                 end_date=c.end_date,
             )

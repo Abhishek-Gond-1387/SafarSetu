@@ -40,6 +40,19 @@ const isMetroStop = (stop: StopItem) => {
   return stop.stop_id.startsWith('metro_') || stop.stop_name.toLowerCase().includes('metro');
 };
 
+const getModePref = (modeId: string, origId?: string, destId?: string): 'bus' | 'metro' | 'all' | 'multimodal' => {
+  if (modeId === 'auto' || modeId === 'cab' || modeId === 'multimodal') return 'all';
+  if (modeId === 'metro') {
+    // If either stop is not a metro station, pure rail is impossible without surface transit
+    const origIsMetro = origId ? origId.startsWith('metro_') : false;
+    const destIsMetro = destId ? destId.startsWith('metro_') : false;
+    if (!origIsMetro || !destIsMetro) return 'all';
+    return 'metro';
+  }
+  if (modeId === 'bus') return 'bus';
+  return 'all';
+};
+
 const POPULAR_DESTINATIONS = [
   { label: '🏛️ Red Fort', query: 'Red Fort' },
   { label: '🎓 MAIT', query: 'MAIT' },
@@ -254,7 +267,7 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
 
       // Auto-compute routes for the active path so the choosing page displays routes immediately
       if (initialOrigId && initialDestId) {
-        const pref = metroMode?.mode_id === 'auto' || metroMode?.mode_id === 'cab' ? 'all' : (metroMode?.mode_id || 'all');
+        const pref = getModePref(metroMode?.mode_id || 'all', initialOrigId, initialDestId);
         onPlanRoute({
           origin_stop_id: initialOrigId,
           destination_stop_id: initialDestId,
@@ -335,7 +348,7 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
         departure_date: travelDate,
         departure_time: `${travelTime}:00`,
         criterion: criterion,
-        mode_preference: mode.mode_id === 'auto' || mode.mode_id === 'cab' ? 'all' : mode.mode_id,
+        mode_preference: getModePref(mode.mode_id, newOrig, newDest),
         max_transfers: 3,
         max_walk_meters: 800,
       });
@@ -353,7 +366,7 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
         departure_date: travelDate,
         departure_time: `${travelTime}:00`,
         criterion: criterion,
-        mode_preference: selectedModeId === 'auto' || selectedModeId === 'cab' ? 'all' : selectedModeId,
+        mode_preference: getModePref(selectedModeId, finalOrigin, finalDest),
         max_transfers: 3,
         max_walk_meters: 800,
       });
@@ -372,7 +385,7 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
       departure_date: travelDate,
       departure_time: `${travelTime}:00`,
       criterion: selectedCriterion,
-      mode_preference: selectedModeId === 'auto' || selectedModeId === 'cab' ? 'all' : selectedModeId,
+      mode_preference: getModePref(selectedModeId, finalOrigin, finalDest),
       max_transfers: 3,
       max_walk_meters: 800,
     });
@@ -870,7 +883,7 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
                           departure_date: travelDate,
                           departure_time: `${travelTime}:00`,
                           criterion: selectedCriterion,
-                          mode_preference: selectedModeId === 'auto' || selectedModeId === 'cab' ? 'all' : selectedModeId,
+                          mode_preference: getModePref(selectedModeId, e.target.value, finalDest),
                           max_transfers: 3,
                           max_walk_meters: 800,
                         });
@@ -909,7 +922,7 @@ export const ModeExplorerSearch: React.FC<ModeExplorerSearchProps> = ({
                           departure_date: travelDate,
                           departure_time: `${travelTime}:00`,
                           criterion: selectedCriterion,
-                          mode_preference: selectedModeId === 'auto' || selectedModeId === 'cab' ? 'all' : selectedModeId,
+                          mode_preference: getModePref(selectedModeId, finalOrigin, e.target.value),
                           max_transfers: 3,
                           max_walk_meters: 800,
                         });
