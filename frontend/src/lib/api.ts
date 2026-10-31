@@ -6,27 +6,11 @@
  */
 import { supabaseAuth } from './supabase';
 
+// Directly and exclusively point to your Cloudflare Tunnel (Render is completely detached)
+export const CLOUDFLARE_BACKEND_URL = 'https://dna-throat-customers-roles.trycloudflare.com';
+
 const getApiBase = () => {
-  let base = '';
-  if (typeof (globalThis as any).process !== 'undefined' && (globalThis as any).process?.env?.NEXT_PUBLIC_API_BASE_URL) {
-    base = (globalThis as any).process.env.NEXT_PUBLIC_API_BASE_URL;
-  } else if (typeof import.meta !== 'undefined') {
-    base = (import.meta as any).env?.VITE_API_BASE_URL || (import.meta as any).env?.VITE_API_URL || '';
-  }
-
-  if (!base) {
-    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-      return 'http://127.0.0.1:8000/api/v1';
-    }
-    // Production Cloudflare Tunnel / Deployed Fallback
-    base = 'https://dna-throat-customers-roles.trycloudflare.com';
-  }
-
-  base = base.trim().replace(/\/+$/, '');
-  if (base && !base.endsWith('/api/v1')) {
-    base = `${base}/api/v1`;
-  }
-  return base;
+  return `${CLOUDFLARE_BACKEND_URL}/api/v1`;
 };
 
 export const API_BASE = getApiBase();
