@@ -3,12 +3,13 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.api import api_router
 from app.api.v1.endpoints.health import get_health
 from app.core.config import settings
+from app.core.observability import ObservabilityMiddleware, metrics_collector
 from app.schemas.routing import HealthResponse
 from app.services.data_source_service import TransitContext
 
@@ -53,6 +54,15 @@ app.add_middleware(
 
 # Include API v1 router
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Observability Middleware & Prometheus Metrics Endpoint
+app.add_middleware(ObservabilityMiddleware)
+
+@app.get("/metrics", response_class=PlainTextResponse, tags=["Observability"], summary="Prometheus Metrics")
+@app.get(f"{settings.API_V1_STR}/metrics", response_class=PlainTextResponse, tags=["Observability"], summary="Prometheus Metrics")
+def get_prometheus_metrics():
+    """Exposes real-time system metrics, cache hit ratios, and latency in Prometheus exposition format."""
+    return metrics_collector.to_prometheus_format()
 
 # Mount frontend dist if compiled
 _frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"

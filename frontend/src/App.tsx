@@ -30,6 +30,7 @@ import {
   StopItem,
 } from './lib/api';
 import { supabaseAuth, UserSession } from './lib/supabase';
+import { useOnlineStatus, OfflineStorage } from './lib/offlineStorage';
 import {
   Compass,
   AlertTriangle,
@@ -127,6 +128,7 @@ const PlannerPage: React.FC<{
   onOpenSafetyFeedback,
 }) => {
   const isPlannerRoute = useLocation().pathname === '/planner';
+  const isOnline = useOnlineStatus();
   const [searchMode, setSearchMode] = useState<'explorer' | 'standard'>('explorer');
   const [selectedJourneyIndex, setSelectedJourneyIndex] = useState<number>(0);
   const [selectedLegIndex, setSelectedLegIndex] = useState<number | null>(null);
@@ -155,6 +157,37 @@ const PlannerPage: React.FC<{
       />
 
       <div className="app-main-content">
+        {/* Offline-First Resilience Active Banner */}
+        {!isOnline && (
+          <div style={{
+            backgroundColor: '#451a03',
+            borderBottom: '1px solid #d97706',
+            color: '#fef3c7',
+            padding: '0.65rem 1.25rem',
+            fontSize: '0.85rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+            zIndex: 100,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <span style={{ fontSize: '1.2rem' }}>📡</span>
+              <div>
+                <strong>Offline-First Resilience Active:</strong> Commuting without internet connectivity (underground Delhi Metro). Your active route instructions and emergency contacts remain preserved offline.
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <a href="tel:112" style={{ color: '#fed7aa', fontWeight: 600, textDecoration: 'underline' }}>Call 112 (Police)</a>
+              <span>•</span>
+              <a href="tel:1091" style={{ color: '#fed7aa', fontWeight: 600, textDecoration: 'underline' }}>Call 1091 (Women)</a>
+              <span>•</span>
+              <a href="tel:155370" style={{ color: '#fed7aa', fontWeight: 600, textDecoration: 'underline' }}>155370 (Metro)</a>
+            </div>
+          </div>
+        )}
+
         {/* Freshness Banner */}
         <DataFreshnessBanner health={health} />
 

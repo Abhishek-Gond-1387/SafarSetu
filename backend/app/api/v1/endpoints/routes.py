@@ -2,6 +2,7 @@
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Body, Depends, HTTPException, status
+from app.core.cache import generate_route_plan_cache_key, route_plan_cache
 from app.core.rate_limit import rate_limit_plan
 
 from app.models.journey import LegMode, RouteRankCriterion
@@ -63,6 +64,18 @@ def plan_route(req: RoutePlanRequest = Body(...)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Destination stop '{req.destination_stop_id}' does not exist in dataset.",
         )
+
+    # Check Multi-Tier Cache for instant sub-millisecond retrieval
+    cache_key = generate_route_plan_cache_key(
+        origin_id=req.origin_stop_id,
+        dest_id=req.destination_stop_id,
+        departure_date=req.departure_date.isoformat(),
+        departure_time=req.departure_time,
+        criterion=req.criterion,
+    )
+    cached_plan = route_plan_cache.get(cache_key)
+    if cached_plan is not None:
+        return cached_plan
 
     criterion = RouteRankCriterion(req.criterion)
     raw_journeys, no_route_reason = ctx.router.plan_journey(
@@ -218,7 +231,7 @@ def plan_route(req: RoutePlanRequest = Body(...)):
         else:
             cal_note = f"Service calendar valid through {ctx.dataset.feed_info.feed_end_date.isoformat()}."
 
-    return RoutePlanResponse(
+    response = RoutePlanResponse(
         origin_stop_id=req.origin_stop_id,
         destination_stop_id=req.destination_stop_id,
         departure_date=req.departure_date.isoformat(),
@@ -229,6 +242,8 @@ def plan_route(req: RoutePlanRequest = Body(...)):
         calendar_validity_note=cal_note,
         no_route_reason=no_route_reason,
     )
+    route_plan_cache.set(cache_key, response, ttl_seconds=300.0)
+    return response
 
 
 @router.post("/compare", response_model=RouteCompareResponse, summary="Compare Route Options")

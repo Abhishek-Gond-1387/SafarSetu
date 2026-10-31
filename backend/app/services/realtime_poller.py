@@ -9,6 +9,7 @@ import urllib.parse
 
 import httpx
 
+from app.core.circuit_breaker import CircuitState, CircuitBreakerOpenException, otd_realtime_breaker
 from app.core.config import settings
 from app.models.realtime import ErrorCategory
 from app.repositories.realtime_repository import RealtimeVehicleRepository
@@ -120,7 +121,14 @@ class OTDRealtimePoller:
         should_close_client = (client != self._client)
 
         try:
-            resp = await client.get(auth_url)
+            # Protect external Delhi OTD endpoint with Circuit Breaker
+            async def _fetch_otd():
+                r = await client.get(auth_url)
+                if r.status_code >= 500:
+                    r.raise_for_status()
+                return r
+
+            resp = await otd_realtime_breaker.call(_fetch_otd)
             if resp.status_code == 200:
                 raw_bytes = resp.content
                 # Retrieve current static dataset for matching
@@ -165,6 +173,13 @@ class OTDRealtimePoller:
                 )
                 logger.warning("OTD Real-Time HTTP error %d at %s", resp.status_code, safe_url)
                 return False
+
+        except CircuitBreakerOpenException as e:
+            self.repository.record_error(
+                ErrorCategory.NETWORK_ERROR,
+                f"Circuit breaker is OPEN: OTD service temporarily paused. Probe allowed in {round(e.retry_after_seconds, 1)}s.",
+            )
+            return False
 
         except httpx.TimeoutException as e:
             self._consecutive_failures += 1

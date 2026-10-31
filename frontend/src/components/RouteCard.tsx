@@ -18,6 +18,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { Journey, JourneyLeg } from '../lib/api';
+import { OfflineStorage } from '../lib/offlineStorage';
 
 const getMetroStyle = (routeShortName?: string, routeLongName?: string) => {
   const text = (routeShortName || routeLongName || '').toUpperCase();
@@ -87,6 +88,7 @@ export const RouteCard: React.FC<RouteCardProps> = ({
 
   const handleSaveClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    OfflineStorage.saveActiveJourney(journey);
     onSaveJourney(journey);
     setJustSaved(true);
     setTimeout(() => setJustSaved(false), 2500);
@@ -224,6 +226,7 @@ export const RouteCard: React.FC<RouteCardProps> = ({
       <div
         className="journey-flow-strip"
         onClick={() => {
+          OfflineStorage.saveActiveJourney(journey);
           onSelect?.();
           setExpanded(!expanded);
         }}
